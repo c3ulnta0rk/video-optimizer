@@ -1,14 +1,15 @@
-import { Component, OnInit, signal, ViewEncapsulation } from "@angular/core";
+import { Component, OnInit, ViewEncapsulation } from "@angular/core";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MatToolbarModule } from "@angular/material/toolbar";
 import { MatIconModule } from "@angular/material/icon";
 import { MatButtonModule } from "@angular/material/button";
 import { FilesSelectorComponent } from "../components/files-selector/files-selector.component";
+import { VideosTableComponent } from "../components/videos-table/videos-table.component";
 import {
-  VideosTableComponent,
+  FilesManagerService,
   VideoFile,
-} from "../components/videos-table/videos-table.component";
+} from "../services/files-manager.service";
 
 @Component({
   selector: "app-root",
@@ -24,8 +25,9 @@ import {
   encapsulation: ViewEncapsulation.None,
 })
 export class AppComponent implements OnInit {
-  public readonly videosPaths = signal<string[]>([]);
-  public readonly selectedVideo = signal<VideoFile | null>(null);
+  public readonly selectedVideo = this.filesManager.selectedVideo;
+
+  constructor(private filesManager: FilesManagerService) {}
 
   ngOnInit(): void {
     // Détection initiale
@@ -52,20 +54,10 @@ export class AppComponent implements OnInit {
   }
 
   public onVideoSelected(video: VideoFile): void {
-    this.selectedVideo.set(video);
-    console.log("Vidéo sélectionnée:", video);
+    console.log("Vidéo sélectionnée dans AppComponent:", video);
   }
 
   public onVideoRemoved(videoPath: string): void {
-    const currentPaths = this.videosPaths();
-    const updatedPaths = currentPaths.filter((path) => path !== videoPath);
-    this.videosPaths.set(updatedPaths);
-
-    // Si la vidéo supprimée était sélectionnée, on désélectionne
-    if (this.selectedVideo()?.path === videoPath) {
-      this.selectedVideo.set(null);
-    }
-
-    console.log("Vidéo supprimée:", videoPath);
+    console.log("Vidéo supprimée dans AppComponent:", videoPath);
   }
 }

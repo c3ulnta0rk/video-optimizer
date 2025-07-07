@@ -3,113 +3,127 @@
     <h3>Fichiers vidéo sélectionnés ({{ videoFiles().length }})</h3>
   </div>
 
-  <div class="table-content" *ngIf="videoFiles().length > 0; else noFiles">
-    <table mat-table [dataSource]="videoFiles()" class="videos-table">
-      <!-- Nom du fichier -->
-      <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef>Nom du fichier</th>
-        <td mat-cell *matCellDef="let video">
-          <div class="file-info">
-            <mat-icon class="file-icon">video_file</mat-icon>
-            <span class="file-name">{{ video.name }}</span>
-          </div>
-        </td>
-      </ng-container>
+  @if (videoFiles().length > 0) {
+    <div class="table-content">
+      <table mat-table [dataSource]="videoFiles()" class="videos-table">
+        <!-- Nom du fichier -->
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Nom du fichier</th>
+          <td mat-cell *matCellDef="let video">
+            <div class="file-info">
+              <mat-icon class="file-icon">video_file</mat-icon>
+              <span class="file-name">{{ video.name }}</span>
+            </div>
+          </td>
+        </ng-container>
 
-      <!-- Taille du fichier -->
+              <!-- Taille du fichier -->
       <ng-container matColumnDef="size">
         <th mat-header-cell *matHeaderCellDef>Taille</th>
         <td mat-cell *matCellDef="let video">
-          <span class="file-size">{{ formatFileSize(video.size || 0) }}</span>
-        </td>
-      </ng-container>
-
-      <!-- Actions -->
-      <ng-container matColumnDef="actions">
-        <th mat-header-cell *matHeaderCellDef>Actions</th>
-        <td mat-cell *matCellDef="let video">
-          <div class="actions-container">
-            <button 
-              mat-icon-button 
-              color="primary"
-              matTooltip="Voir les détails d'optimisation"
-              (click)="onVideoClick(video)"
-              [class.selected]="selectedVideo()?.path === video.path">
-              <mat-icon>info</mat-icon>
-            </button>
-            <button 
-              mat-icon-button 
-              color="warn"
-              matTooltip="Supprimer de la liste"
-              (click)="onVideoRemove(video, $event)">
-              <mat-icon>delete</mat-icon>
-            </button>
+          <div class="file-size-container">
+            <span class="file-size" *ngIf="!video.loading">{{ formatFileSize(video.size || 0) }}</span>
+            <div class="loading-indicator" *ngIf="video.loading">
+              <mat-progress-spinner mode="indeterminate" diameter="16"></mat-progress-spinner>
+              <span>Chargement...</span>
+            </div>
+            <span class="error-text" *ngIf="video.error && !video.loading">{{ video.error }}</span>
           </div>
         </td>
       </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr 
-        mat-row 
-        *matRowDef="let row; columns: displayedColumns;"
-        class="video-row"
-        [class.selected-row]="selectedVideo()?.path === row.path"
-        (click)="onVideoClick(row)">
-      </tr>
-    </table>
-  </div>
+        <!-- Actions -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let video">
+            <div class="actions-container">
+              <button 
+                mat-icon-button 
+                color="primary"
+                matTooltip="Voir les détails d'optimisation"
+                (click)="onVideoClick(video)"
+                [class.selected]="selectedVideo()?.path === video.path">
+                <mat-icon>info</mat-icon>
+              </button>
+              <button 
+                mat-icon-button 
+                color="warn"
+                matTooltip="Supprimer de la liste"
+                (click)="onVideoRemove(video, $event)">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          </td>
+        </ng-container>
 
-  <!-- Template pour quand aucun fichier n'est sélectionné -->
-  <ng-template #noFiles>
-    <div class="no-files">
-      <mat-icon class="no-files-icon">video_library</mat-icon>
-      <p>Aucun fichier vidéo sélectionné</p>
-      <p class="subtitle">Sélectionnez des fichiers vidéo pour commencer l'optimisation</p>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr 
+          mat-row 
+          *matRowDef="let row; columns: displayedColumns;"
+          class="video-row"
+          [class.selected-row]="selectedVideo()?.path === row.path"
+          (click)="onVideoClick(row)">
+        </tr>
+      </table>
     </div>
-  </ng-template>
-
-  <!-- Détails du fichier sélectionné -->
-  <div class="video-details" *ngIf="selectedVideo()">
-    <div class="details-header">
-      <h4>Détails d'optimisation</h4>
-      <button mat-icon-button (click)="selectedVideo.set(null)">
-        <mat-icon>close</mat-icon>
-      </button>
-    </div>
-    
-    <div class="details-content">
-      <div class="detail-item">
-        <strong>Fichier:</strong> {{ selectedVideo()?.name }}
+  } @else {
+    <ng-template>
+      <div class="no-files">
+        <mat-icon class="no-files-icon">video_library</mat-icon>
+        <p>Aucun fichier vidéo sélectionné</p>
+        <p class="subtitle">Sélectionnez des fichiers vidéo pour commencer l'optimisation</p>
       </div>
-      <div class="detail-item">
-        <strong>Chemin:</strong> {{ selectedVideo()?.path }}
-      </div>
-      <div class="detail-item">
-        <strong>Taille actuelle:</strong> {{ formatFileSize(selectedVideo()?.size || 0) }}
-      </div>
-      <div class="detail-item">
-        <strong>Durée:</strong> {{ formatDuration(selectedVideo()?.duration || 0) }}
-      </div>
-      <div class="detail-item">
-        <strong>Résolution:</strong> {{ selectedVideo()?.resolution || 'Non détectée' }}
-      </div>
-      <div class="detail-item">
-        <strong>Codec:</strong> {{ selectedVideo()?.codec || 'Non détecté' }}
-      </div>
-      <div class="detail-item">
-        <strong>Bitrate:</strong> {{ selectedVideo()?.bitrate ? ((selectedVideo()?.bitrate || 0) / 1000).toFixed(0) + ' kbps' : 'Non détecté' }}
+    </ng-template>
+  }
+  @if (selectedVideo()) {
+    <div class="video-details overflow-auto">
+      <div class="details-header">
+        <h4>Détails d'optimisation</h4>
+        <button mat-icon-button (click)="clearSelection()">
+          <mat-icon>close</mat-icon>
+        </button>
       </div>
       
-      <div class="optimization-options">
-        <h5>Options d'optimisation</h5>
-        <div class="options-grid">
-          <mat-chip-set>
-            <mat-chip color="primary" selected>Compression H.264</mat-chip>
-            <mat-chip color="primary" selected>Résolution adaptative</mat-chip>
-            <mat-chip color="primary" selected>Optimisation audio</mat-chip>
-          </mat-chip-set>
+      <div class="details-content">
+        <div class="detail-item">
+          <strong>Fichier:</strong> {{ selectedVideo()?.name }}
+        </div>
+        <div class="detail-item">
+          <strong>Chemin:</strong> {{ selectedVideo()?.path }}
+        </div>
+        <div class="detail-item">
+          <strong>Taille actuelle:</strong> {{ formatFileSize(selectedVideo()?.size || 0) }}
+        </div>
+        <div class="detail-item">
+          <strong>Durée:</strong> {{ formatDuration(selectedVideo()?.duration || 0) }}
+        </div>
+        <div class="detail-item">
+          <strong>Résolution:</strong> {{ selectedVideo()?.resolution || 'Non détectée' }}
+        </div>
+        <div class="detail-item">
+          <strong>Codec:</strong> {{ selectedVideo()?.codec || 'Non détecté' }}
+        </div>
+        <div class="detail-item">
+          <strong>Bitrate:</strong> {{ selectedVideo()?.bitrate ? ((selectedVideo()?.bitrate || 0) / 1000).toFixed(0) + ' kbps' : 'Non détecté' }}
+        </div>
+        <div class="detail-item">
+          <strong>FPS:</strong> {{ selectedVideo()?.fps ? (selectedVideo()?.fps || 0).toFixed(2) + ' fps' : 'Non détecté' }}
+        </div>
+        <div class="detail-item" *ngIf="selectedVideo()?.error">
+          <strong>Erreur:</strong> <span class="error-text">{{ selectedVideo()?.error }}</span>
+        </div>
+        
+        <div class="optimization-options">
+          <h5>Options d'optimisation</h5>
+          <div class="options-grid">
+            <mat-chip-set>
+              <mat-chip color="primary" selected>Compression H.264</mat-chip>
+              <mat-chip color="primary" selected>Résolution adaptative</mat-chip>
+              <mat-chip color="primary" selected>Optimisation audio</mat-chip>
+            </mat-chip-set>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  }
 </div> 

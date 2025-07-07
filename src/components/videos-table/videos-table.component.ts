@@ -1,10 +1,8 @@
 import {
   Component,
-  Input,
   Output,
   EventEmitter,
   signal,
-  input,
   output,
   effect,
 } from "@angular/core";
@@ -14,16 +12,11 @@ import { MatIconModule } from "@angular/material/icon";
 import { MatButtonModule } from "@angular/material/button";
 import { MatChipsModule } from "@angular/material/chips";
 import { MatTooltipModule } from "@angular/material/tooltip";
-
-export interface VideoFile {
-  path: string;
-  name: string;
-  size?: number;
-  duration?: number;
-  resolution?: string;
-  codec?: string;
-  bitrate?: number;
-}
+import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
+import {
+  FilesManagerService,
+  VideoFile,
+} from "../../services/files-manager.service";
 
 @Component({
   selector: "app-videos-table",
@@ -35,77 +28,49 @@ export interface VideoFile {
     MatButtonModule,
     MatChipsModule,
     MatTooltipModule,
+    MatProgressSpinnerModule,
   ],
   templateUrl: "./videos-table.component.html",
   styleUrls: ["./videos-table.component.scss"],
 })
 export class VideosTableComponent {
-  public readonly videosPaths = input<string[]>([]);
-
   public readonly videoSelected = output<VideoFile>();
   public readonly videoRemoved = output<string>();
 
-  public readonly videoFiles = signal<VideoFile[]>([]);
+  public readonly videoFiles = this.filesManager.videoFiles;
   public readonly displayedColumns = ["name", "size", "actions"];
 
-  public readonly selectedVideo = signal<VideoFile | null>(null);
+  public readonly selectedVideo = this.filesManager.selectedVideo;
 
-  constructor() {
+  constructor(private filesManager: FilesManagerService) {
     effect(() => {
-      this.videoFiles.set(this.convertPathsToVideoFiles(this.videosPaths()));
+      // Écouter les changements de vidéo sélectionnée pour émettre l'événement
+      const selected = this.selectedVideo();
+      if (selected) {
+        this.videoSelected.emit(selected);
+      }
     });
   }
 
-  private convertPathsToVideoFiles(paths: string[]): VideoFile[] {
-    return paths.map((path) => ({
-      path,
-      name: this.extractFileName(path),
-      size: 0, // À remplacer par la vraie taille du fichier
-      duration: 0, // À remplacer par la vraie durée
-      resolution: "Unknown", // À remplacer par la vraie résolution
-      codec: "Unknown", // À remplacer par le vrai codec
-      bitrate: 0, // À remplacer par le vrai bitrate
-    }));
-  }
-
-  private extractFileName(path: string): string {
-    return path.split("/").pop() || path.split("\\").pop() || path;
-  }
-
   public onVideoClick(video: VideoFile): void {
-    this.selectedVideo.set(video);
-    this.videoSelected.emit(video);
+    this.filesManager.selectVideo(video);
   }
 
   public onVideoRemove(video: VideoFile, event: Event): void {
     event.stopPropagation(); // Empêche la sélection de la ligne
+    this.filesManager.removeVideoPath(video.path);
     this.videoRemoved.emit(video.path);
+  }
 
-    // Si la vidéo supprimée était sélectionnée, on désélectionne
-    if (this.selectedVideo()?.path === video.path) {
-      this.selectedVideo.set(null);
-    }
+  public clearSelection(): void {
+    this.filesManager.selectVideo(null);
   }
 
   public formatFileSize(bytes: number): string {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+    return this.filesManager.formatFileSize(bytes);
   }
 
   public formatDuration(seconds: number): string {
-    if (seconds === 0) return "--:--";
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+    return this.filesManager.formatDuration(seconds);
   }
 }

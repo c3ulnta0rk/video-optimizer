@@ -1,7 +1,7 @@
 <div class="flex flex-row flex-between items-center gap-2">
   <mat-slide-toggle
     [checked]="directory()"
-    (change)="directory.set($event.checked)"
+    (change)="onToggleDirectory($event.checked)"
     matTooltip="Scan directory"
     >{{ (directory() ? 'Scan' : 'Don\'t scan') }} directory</mat-slide-toggle
   >
