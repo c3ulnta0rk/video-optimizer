@@ -1,9 +1,19 @@
 import { Component, OnInit, ViewEncapsulation } from "@angular/core";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { MatToolbarModule } from "@angular/material/toolbar";
+import { MatIconModule } from "@angular/material/icon";
+import { MatButtonModule } from "@angular/material/button";
+import { FilesSelectorComponent } from "../components/files-selector/files-selector.component";
 
 @Component({
   selector: "app-root",
+  imports: [
+    MatToolbarModule,
+    MatIconModule,
+    MatButtonModule,
+    FilesSelectorComponent,
+  ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.scss",
   encapsulation: ViewEncapsulation.None,
@@ -23,16 +33,12 @@ export class AppComponent implements OnInit {
     getCurrentWindow()
       .theme()
       .then((theme: "dark" | "light" | null) => {
-        if (
-          theme === "dark" &&
-          !window.document.body.classList.contains("dark")
-        ) {
+        if (theme === "dark") {
           window.document.body.classList.add("dark");
-        } else if (
-          theme === "light" &&
-          window.document.body.classList.contains("dark")
-        ) {
+          window.document.body.classList.remove("light");
+        } else if (theme === "light") {
           window.document.body.classList.remove("dark");
+          window.document.body.classList.add("light");
         }
       });
   }

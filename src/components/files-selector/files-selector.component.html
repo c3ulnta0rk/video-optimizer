@@ -1,0 +1,16 @@
+<div class="flex flex-row flex-between items-center gap-2">
+  <mat-slide-toggle
+    [checked]="directory()"
+    (change)="directory.set($event.checked)"
+    matTooltip="Scan directory"
+    >{{ (directory() ? 'Scan' : 'Don\'t scan') }} directory</mat-slide-toggle
+  >
+  <button
+    mat-raised-button
+    (click)="onAddFiles()"
+    matTooltip="Choose files to optimize"
+  >
+    <mat-icon>add</mat-icon>
+    <span>Choose files</span>
+  </button>
+</div>
