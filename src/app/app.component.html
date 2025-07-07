@@ -1,4 +1,9 @@
 <mat-toolbar class="justify-between">
   <span>Video Optimizer</span>
-  <app-files-selector/>
+  <app-files-selector [(videosPaths)]="videosPaths" />
 </mat-toolbar>
+
+<app-videos-table 
+  [videosPaths]="videosPaths()" 
+  (videoSelected)="onVideoSelected($event)"
+  (videoRemoved)="onVideoRemoved($event)" />
