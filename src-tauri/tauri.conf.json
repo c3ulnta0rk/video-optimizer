@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "video",
+  "productName": "Video Optimizer",
   "version": "0.1.0",
-  "identifier": "com.video.app",
+  "identifier": "com.video-optimizer.app",
   "build": {
     "beforeDevCommand": "bun run start",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "video",
+        "title": "Video Optimizer",
         "width": 800,
         "height": 600
       }
