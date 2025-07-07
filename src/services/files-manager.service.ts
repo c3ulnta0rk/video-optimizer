@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   MovieTitleParserService,
   MovieInfo,
+  MovieSearchResult,
 } from "./movie-title-parser.service";
 import { firstValueFrom } from "rxjs";
 
@@ -21,6 +22,7 @@ export interface VideoFile {
   loading: boolean;
   movieInfo?: MovieInfo;
   movieInfoLoading?: boolean;
+  movieAlternatives?: MovieSearchResult;
 }
 
 @Injectable({
@@ -326,11 +328,15 @@ export class FilesManagerService {
 
     try {
       const fileName = this.extractFileName(filePath);
-      const movieInfo = await firstValueFrom(
-        this.movieParser.parseMovieTitle(fileName)
+      const searchResult = await firstValueFrom(
+        this.movieParser.searchMovieWithAlternatives(fileName)
       );
 
-      console.log("Movie info:", movieInfo);
+      console.log("Movie search result:", searchResult);
+
+      // Si il y a des alternatives, on pourra ouvrir le dialogue plus tard
+      // Pour l'instant, on utilise le film sélectionné par défaut
+      const movieInfo = searchResult.selected;
 
       // Mettre à jour avec les infos du film
       const finalFiles = [...this.videoFiles()];
@@ -340,6 +346,11 @@ export class FilesManagerService {
         movieInfoLoading: false,
       };
       this.videoFiles.set(finalFiles);
+
+      // Stocker les alternatives pour une utilisation future
+      if (searchResult.alternatives.length > 1) {
+        finalFiles[fileIndex].movieAlternatives = searchResult;
+      }
     } catch (error) {
       console.error("Erreur lors du chargement des infos du film:", error);
 
@@ -362,5 +373,41 @@ export class FilesManagerService {
     for (const file of currentFiles) {
       await this.loadMovieInfo(file.path);
     }
+  }
+
+  /**
+   * Ouvre le dialogue de sélection de films alternatifs
+   */
+  public openMovieAlternativesDialog(
+    filePath: string
+  ): MovieSearchResult | null {
+    const currentFiles = this.videoFiles();
+    const file = currentFiles.find((f) => f.path === filePath);
+
+    if (
+      file?.movieAlternatives &&
+      file.movieAlternatives.alternatives.length > 1
+    ) {
+      return file.movieAlternatives;
+    }
+
+    return null;
+  }
+
+  /**
+   * Met à jour les informations du film après sélection dans le dialogue
+   */
+  public updateMovieInfo(filePath: string, movieInfo: MovieInfo): void {
+    const currentFiles = this.videoFiles();
+    const fileIndex = currentFiles.findIndex((f) => f.path === filePath);
+
+    if (fileIndex === -1) return;
+
+    const updatedFiles = [...currentFiles];
+    updatedFiles[fileIndex] = {
+      ...updatedFiles[fileIndex],
+      movieInfo,
+    };
+    this.videoFiles.set(updatedFiles);
   }
 }

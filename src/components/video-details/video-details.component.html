@@ -1,0 +1,210 @@
+@if (selectedVideo) {
+<div class="video-details-container">
+  <div class="details-header">
+    <h4>Détails d'optimisation</h4>
+    <button mat-icon-button (click)="onCloseDetails()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Informations du film -->
+  @if (selectedVideo.movieInfo) {
+  <app-movie-info
+    [movieInfo]="selectedVideo.movieInfo"
+    [showAlternativesButton]="
+      !!(
+        selectedVideo.movieAlternatives &&
+        (selectedVideo.movieAlternatives?.alternatives?.length || 0) > 1
+      )
+    "
+    (openAlternatives)="onOpenMovieAlternatives()"
+  >
+  </app-movie-info>
+  }
+
+  <!-- Détails techniques -->
+  <div class="technical-details">
+    <h5>Informations techniques</h5>
+
+    <div class="details-grid">
+      <div class="detail-item">
+        <strong>Fichier:</strong>
+        <span>{{ selectedVideo.name }}</span>
+      </div>
+
+      <div class="detail-item">
+        <strong>Chemin:</strong>
+        <span class="file-path">{{ selectedVideo.path }}</span>
+      </div>
+
+      <div class="detail-item">
+        <strong>Taille actuelle:</strong>
+        <span>{{ formatFileSize(selectedVideo.size || 0) }}</span>
+      </div>
+
+      <div class="detail-item">
+        <strong>Durée:</strong>
+        <span>{{ formatDuration(selectedVideo.duration || 0) }}</span>
+      </div>
+
+      <div class="detail-item">
+        <strong>Résolution:</strong>
+        <span>{{ selectedVideo.resolution || "Non détectée" }}</span>
+      </div>
+
+      <div class="detail-item">
+        <strong>Codec:</strong>
+        <span>{{ selectedVideo.codec || "Non détecté" }}</span>
+      </div>
+
+      <div class="detail-item">
+        <strong>Bitrate:</strong>
+        <span>
+          {{
+            selectedVideo.bitrate
+              ? ((selectedVideo.bitrate || 0) / 1000).toFixed(0) + " kbps"
+              : "Non détecté"
+          }}
+        </span>
+      </div>
+
+      <div class="detail-item">
+        <strong>FPS:</strong>
+        <span>
+          {{
+            selectedVideo.fps
+              ? (selectedVideo.fps || 0).toFixed(2) + " fps"
+              : "Non détecté"
+          }}
+        </span>
+      </div>
+
+      @if (selectedVideo.error) {
+      <div class="detail-item error">
+        <strong>Erreur:</strong>
+        <span class="error-text">{{ selectedVideo.error }}</span>
+      </div>
+      }
+    </div>
+  </div>
+
+  <!-- Configuration de sortie -->
+  @if (generatedFilename()) {
+  <div class="output-config-section">
+    <h5>Configuration de sortie</h5>
+
+    <div class="config-grid">
+      <!-- Format de sortie -->
+      <mat-form-field appearance="outline">
+        <mat-label>Format</mat-label>
+        <mat-select
+          [(ngModel)]="outputConfig().format"
+          (selectionChange)="onConfigChange({ format: $event.value })"
+        >
+          <mat-option value="mp4">MP4</mat-option>
+          <mat-option value="mkv">MKV</mat-option>
+          <mat-option value="avi">AVI</mat-option>
+          <mat-option value="mov">MOV</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Qualité -->
+      <mat-form-field appearance="outline">
+        <mat-label>Qualité</mat-label>
+        <mat-select
+          [(ngModel)]="outputConfig().quality"
+          (selectionChange)="onConfigChange({ quality: $event.value })"
+        >
+          <mat-option value="4K">4K</mat-option>
+          <mat-option value="1080p">1080p</mat-option>
+          <mat-option value="720p">720p</mat-option>
+          <mat-option value="480p">480p</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Codec vidéo -->
+      <mat-form-field appearance="outline">
+        <mat-label>Codec vidéo</mat-label>
+        <mat-select
+          [(ngModel)]="outputConfig().codec"
+          (selectionChange)="onConfigChange({ codec: $event.value })"
+        >
+          <mat-option value="h264">H.264 (x264)</mat-option>
+          <mat-option value="h265">H.265 (x265)</mat-option>
+          <mat-option value="vp9">VP9</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Codec audio -->
+      <mat-form-field appearance="outline">
+        <mat-label>Codec audio</mat-label>
+        <mat-select
+          [(ngModel)]="outputConfig().audio"
+          (selectionChange)="onConfigChange({ audio: $event.value })"
+        >
+          <mat-option value="aac">AAC</mat-option>
+          <mat-option value="ac3">AC3</mat-option>
+          <mat-option value="mp3">MP3</mat-option>
+          <mat-option value="opus">Opus</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!-- Nom de fichier généré -->
+    <div class="filename-section">
+      <h6>Nom de fichier de sortie</h6>
+      <div class="filename-display">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Nom du fichier</mat-label>
+          <input
+            matInput
+            [value]="generatedFilename()?.filename"
+            (input)="onFilenameChange($event)"
+            placeholder="Nom du fichier de sortie"
+          />
+          <mat-hint
+            >Le nom sera généré automatiquement selon vos paramètres</mat-hint
+          >
+        </mat-form-field>
+
+        <div class="file-path-display">
+          <mat-icon>folder</mat-icon>
+          <span>{{ generatedFilename()?.suggestedPath }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- Options d'optimisation -->
+  <div class="optimization-section">
+    <h5>Options d'optimisation</h5>
+
+    <div class="optimization-options">
+      <mat-chip-set>
+        <mat-chip color="primary" selected>
+          <mat-icon>video_file</mat-icon>
+          Compression H.264
+        </mat-chip>
+        <mat-chip color="primary" selected>
+          <mat-icon>aspect_ratio</mat-icon>
+          Résolution adaptative
+        </mat-chip>
+        <mat-chip color="primary" selected>
+          <mat-icon>audiotrack</mat-icon>
+          Optimisation audio
+        </mat-chip>
+        <mat-chip color="accent">
+          <mat-icon>speed</mat-icon>
+          Optimisation vitesse
+        </mat-chip>
+      </mat-chip-set>
+    </div>
+  </div>
+</div>
+} @else {
+<div class="no-selection">
+  <mat-icon>info</mat-icon>
+  <p>Sélectionnez une vidéo pour voir les détails d'optimisation</p>
+</div>
+}

@@ -1,4 +1,4 @@
-import { inject, Injectable } from "@angular/core";
+import { inject, Injectable, signal } from "@angular/core";
 import { HttpClient } from "@angular/common/http";
 import { SettingsService } from "./settings.service";
 import { Observable, of, throwError } from "rxjs";
@@ -12,6 +12,12 @@ export interface MovieInfo {
   posterPath?: string;
   overview?: string;
   confidence: number; // 0-1, confiance dans l'extraction
+  backdropPath?: string;
+  voteAverage?: number;
+  voteCount?: number;
+  popularity?: number;
+  releaseDate?: string;
+  genres?: string[];
 }
 
 export interface ParsedTitle {
@@ -24,14 +30,20 @@ export interface ParsedTitle {
   originalName: string;
 }
 
+export interface MovieSearchResult {
+  selected: MovieInfo;
+  alternatives: MovieInfo[];
+  originalQuery: string;
+}
+
 @Injectable({
   providedIn: "root",
 })
 export class MovieTitleParserService {
-  private readonly TMDB_BASE_URL = "https://api.themoviedb.org/3";
+  private readonly TMDB_BASE_URL = signal("https://api.themoviedb.org/3");
 
   // Patterns courants pour les noms de fichiers
-  private readonly TITLE_PATTERNS = [
+  private readonly TITLE_PATTERNS = signal([
     // Pattern: Movie.Name.2023.1080p.BluRay.x264-GROUP
     /^(.+?)\.(\d{4})\.(.+?)-(.+?)$/i,
     // Pattern: Movie Name (2023) 1080p BluRay x264-GROUP
@@ -54,11 +66,9 @@ export class MovieTitleParserService {
     /^(.+?)\s*\((\d{4})\)$/i,
     // Pattern simple: Movie.Name
     /^(.+?)$/i,
-  ];
+  ]);
   private readonly http = inject(HttpClient);
   private readonly settingsService = inject(SettingsService);
-
-  constructor() {}
 
   /**
    * Extrait le titre du film/série à partir du nom de fichier
@@ -90,7 +100,7 @@ export class MovieTitleParserService {
         return of({
           title: parsed.title,
           year: parsed.year,
-          type: fallbackType,
+          type: fallbackType as "movie" | "tv",
           confidence: 0.6,
         });
       })
@@ -112,7 +122,7 @@ export class MovieTitleParserService {
    * Parse le nom de fichier selon les patterns courants
    */
   private parseFileName(fileName: string): ParsedTitle {
-    for (const pattern of this.TITLE_PATTERNS) {
+    for (const pattern of this.TITLE_PATTERNS()) {
       const match = fileName.match(pattern);
       if (match) {
         const groups = match.slice(1);
@@ -189,7 +199,7 @@ export class MovieTitleParserService {
     }
 
     const searchType = parsed.season ? "tv" : "movie";
-    const searchUrl = `${this.TMDB_BASE_URL}/search/${searchType}`;
+    const searchUrl = `${this.TMDB_BASE_URL()}/search/${searchType}`;
 
     const params: any = {
       api_key: apiKey,
@@ -251,7 +261,7 @@ export class MovieTitleParserService {
       return throwError(() => new Error("Clé API TMDB non configurée"));
     }
 
-    const url = `${this.TMDB_BASE_URL}/${type}/${tmdbId}`;
+    const url = `${this.TMDB_BASE_URL()}/${type}/${tmdbId}`;
     const params = {
       api_key: apiKey,
       language: "fr-FR",
@@ -259,5 +269,120 @@ export class MovieTitleParserService {
     };
 
     return this.http.get(url, { params });
+  }
+
+  /**
+   * Recherche le film/série sur TMDB avec alternatives
+   */
+  public searchMovieWithAlternatives(
+    fileName: string
+  ): Observable<MovieSearchResult> {
+    const cleanFileName = this.cleanFileName(fileName);
+    const parsed = this.parseFileName(cleanFileName);
+
+    if (!parsed.title) {
+      return of({
+        selected: {
+          title: cleanFileName,
+          type: "movie",
+          confidence: 0.1,
+        },
+        alternatives: [],
+        originalQuery: cleanFileName,
+      });
+    }
+
+    const apiKey = this.settingsService.getTmdbApiKey();
+    if (!apiKey) {
+      return of({
+        selected: {
+          title: parsed.title,
+          year: parsed.year,
+          type: (parsed.season ? "tv" : "movie") as "movie" | "tv",
+          confidence: 0.6,
+        },
+        alternatives: [],
+        originalQuery: parsed.title,
+      });
+    }
+
+    const searchType = parsed.season ? "tv" : "movie";
+    const searchUrl = `${this.TMDB_BASE_URL()}/search/${searchType}`;
+
+    const params: any = {
+      api_key: apiKey,
+      query: parsed.title,
+      language: "fr-FR",
+      page: 1,
+      include_adult: false,
+    };
+
+    if (parsed.year) {
+      params.year = parsed.year;
+    }
+
+    return this.http.get<any>(searchUrl, { params }).pipe(
+      map((response) => {
+        if (response.results && response.results.length > 0) {
+          const alternatives = response.results
+            .slice(0, 10)
+            .map((result: any) => ({
+              title: result.title || result.name,
+              year:
+                parsed.year ||
+                this.extractYearFromDate(
+                  result.release_date || result.first_air_date
+                ),
+              type: searchType as "movie" | "tv",
+              tmdbId: result.id,
+              posterPath: result.poster_path,
+              backdropPath: result.backdrop_path,
+              overview: result.overview,
+              voteAverage: result.vote_average,
+              voteCount: result.vote_count,
+              popularity: result.popularity,
+              releaseDate: result.release_date || result.first_air_date,
+              confidence: 0.8,
+            }));
+
+          // Sélectionner le plus populaire par défaut
+          const selected = alternatives.reduce(
+            (best: MovieInfo, current: MovieInfo) =>
+              (current.popularity || 0) > (best.popularity || 0)
+                ? current
+                : best
+          );
+
+          return {
+            selected,
+            alternatives,
+            originalQuery: parsed.title,
+          };
+        }
+
+        return {
+          selected: {
+            title: parsed.title,
+            year: parsed.year,
+            type: (parsed.season ? "tv" : "movie") as "movie" | "tv",
+            confidence: 0.5,
+          },
+          alternatives: [],
+          originalQuery: parsed.title,
+        };
+      }),
+      catchError(() => {
+        return of({
+          selected: {
+            title: parsed.title,
+            year: parsed.year,
+            type: (parsed.season ? "tv" : "movie") as "movie" | "tv",
+            confidence: 0.6,
+          },
+          alternatives: [],
+          originalQuery: parsed.title,
+        });
+      })
+    );
   }
 }

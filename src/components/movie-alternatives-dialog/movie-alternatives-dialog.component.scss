@@ -1,0 +1,125 @@
+.movie-alternatives-dialog {
+  min-width: 800px;
+  max-width: 90vw;
+  max-height: 80vh;
+
+  h2[mat-dialog-title] {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 16px 24px 0;
+
+    mat-icon {
+      color: var(--mdc-filled-button-container-color, #1976d2);
+    }
+  }
+
+  mat-dialog-content {
+    padding: 16px 24px;
+    max-height: 60vh;
+    overflow-y: auto;
+
+    .search-info {
+      margin-bottom: 16px;
+      padding: 12px;
+      background: var(--app-hover);
+      border-radius: 8px;
+
+      p {
+        margin: 4px 0;
+        color: var(--app-text-secondary);
+      }
+    }
+
+    .alternatives-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+
+      .movie-card {
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px var(--app-shadow);
+        }
+
+        &.selected {
+          border-color: var(--mdc-filled-button-container-color, #1976d2);
+          background: var(--app-hover);
+        }
+
+        .movie-poster {
+          position: relative;
+          height: 300px;
+          overflow: hidden;
+
+          img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+
+          .selected-overlay {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--mdc-filled-button-container-color, #1976d2);
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+          }
+        }
+
+        mat-card-content {
+          padding: 12px;
+
+          .movie-title {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--app-text-primary);
+            line-height: 1.2;
+          }
+
+          .movie-year {
+            margin: 0 0 8px 0;
+            color: var(--app-text-secondary);
+            font-size: 14px;
+          }
+
+          .movie-rating {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 8px;
+
+            mat-icon {
+              font-size: 16px;
+              color: #ffc107;
+            }
+
+            span {
+              color: var(--app-text-secondary);
+              font-size: 14px;
+            }
+          }
+
+          .movie-overview {
+            margin: 0;
+            font-size: 12px;
+            color: var(--app-text-secondary);
+            line-height: 1.4;
+          }
+        }
+      }
+    }
+  }
+}

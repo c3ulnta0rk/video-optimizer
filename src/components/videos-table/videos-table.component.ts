@@ -5,6 +5,7 @@ import {
   signal,
   output,
   effect,
+  inject,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatTableModule } from "@angular/material/table";
@@ -13,10 +14,14 @@ import { MatButtonModule } from "@angular/material/button";
 import { MatChipsModule } from "@angular/material/chips";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
+import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import {
   FilesManagerService,
   VideoFile,
 } from "../../services/files-manager.service";
+import { MovieAlternativesDialogComponent } from "../movie-alternatives-dialog/movie-alternatives-dialog.component";
+import { MovieInfoComponent } from "../movie-info/movie-info.component";
+import { VideoDetailsComponent } from "../video-details/video-details.component";
 
 @Component({
   selector: "app-videos-table",
@@ -29,6 +34,9 @@ import {
     MatChipsModule,
     MatTooltipModule,
     MatProgressSpinnerModule,
+    MatDialogModule,
+    MovieInfoComponent,
+    VideoDetailsComponent,
   ],
   templateUrl: "./videos-table.component.html",
   styleUrls: ["./videos-table.component.scss"],
@@ -38,9 +46,11 @@ export class VideosTableComponent {
   public readonly videoRemoved = output<string>();
 
   public readonly videoFiles = this.filesManager.videoFiles;
-  public readonly displayedColumns = ["name", "size", "actions"];
+  public readonly displayedColumns = ["name", "size", "movieTitle", "actions"];
 
   public readonly selectedVideo = this.filesManager.selectedVideo;
+
+  private readonly dialog = inject(MatDialog);
 
   constructor(private filesManager: FilesManagerService) {
     effect(() => {
@@ -72,5 +82,45 @@ export class VideosTableComponent {
 
   public formatDuration(seconds: number): string {
     return this.filesManager.formatDuration(seconds);
+  }
+
+  public onOpenMovieAlternatives(video: VideoFile, event: Event): void {
+    event.stopPropagation(); // Empêche la sélection de la ligne
+
+    const alternatives = this.filesManager.openMovieAlternativesDialog(
+      video.path
+    );
+    if (alternatives) {
+      const dialogRef = this.dialog.open(MovieAlternativesDialogComponent, {
+        width: "900px",
+        maxWidth: "95vw",
+        maxHeight: "90vh",
+        disableClose: false,
+        autoFocus: false,
+        data: { movieResults: alternatives },
+      });
+
+      dialogRef.afterClosed().subscribe((selectedMovie) => {
+        if (selectedMovie) {
+          this.filesManager.updateMovieInfo(video.path, selectedMovie);
+        }
+      });
+    }
+  }
+
+  public getPosterUrl(posterPath: string | undefined): string {
+    if (!posterPath) return "assets/no-poster.png";
+    return `https://image.tmdb.org/t/p/w200${posterPath}`;
+  }
+
+  public onMovieInfoOpenAlternatives(): void {
+    const selectedVideo = this.selectedVideo();
+    if (selectedVideo) {
+      this.onOpenMovieAlternatives(selectedVideo, new Event("click"));
+    }
+  }
+
+  public onCloseDetails(): void {
+    this.clearSelection();
   }
 }

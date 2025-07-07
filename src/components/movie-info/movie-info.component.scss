@@ -1,0 +1,291 @@
+.movie-info-container {
+  display: flex;
+  gap: 2rem;
+  padding: 1.5rem;
+  background: var(--app-surface);
+  border-radius: 12px;
+  border: 1px solid var(--app-border);
+  transition: all 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 4px 12px var(--app-shadow);
+  }
+
+  // Poster du film
+  .movie-poster {
+    position: relative;
+    width: 140px;
+    height: 210px;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 24px var(--app-shadow);
+
+      .poster-overlay {
+        opacity: 1;
+      }
+    }
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .poster-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+
+      mat-icon {
+        font-size: 28px;
+        margin-bottom: 8px;
+      }
+
+      span {
+        font-size: 14px;
+        font-weight: 600;
+      }
+    }
+  }
+
+  // Informations du film
+  .movie-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+
+    // En-tête
+    .movie-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+
+      .title-section {
+        flex: 1;
+        min-width: 0;
+
+        .movie-title {
+          margin: 0 0 0.5rem 0;
+          color: var(--app-text-primary);
+          font-weight: 700;
+          font-size: 1.8rem;
+          line-height: 1.2;
+          word-wrap: break-word;
+        }
+
+        .movie-year {
+          color: var(--app-text-secondary);
+          font-size: 1.2rem;
+          font-weight: 500;
+        }
+      }
+
+      .movie-type-chip {
+        mat-icon {
+          font-size: 18px;
+          margin-right: 6px;
+        }
+      }
+    }
+
+    // Section note et popularité
+    .rating-section {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+
+      .rating {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+
+        .star-icon {
+          color: #ffc107;
+          font-size: 24px;
+        }
+
+        .rating-value {
+          font-weight: 700;
+          color: var(--app-text-primary);
+          font-size: 1.3rem;
+        }
+
+        .rating-count {
+          color: var(--app-text-secondary);
+          font-size: 1rem;
+        }
+      }
+
+      .popularity {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--app-text-secondary);
+        font-size: 1rem;
+
+        mat-icon {
+          font-size: 20px;
+          opacity: 0.8;
+        }
+      }
+    }
+
+    // Section résumé
+    .overview-section {
+      .movie-overview {
+        margin: 0;
+        color: var(--app-text-secondary);
+        line-height: 1.6;
+        font-size: 1rem;
+        text-align: justify;
+      }
+    }
+
+    // Section métadonnées
+    .metadata-section {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+
+      .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        color: var(--app-text-secondary);
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+        background: var(--app-hover);
+        border-radius: 8px;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: var(--app-border);
+        }
+
+        mat-icon {
+          font-size: 18px;
+          opacity: 0.8;
+        }
+
+        &.high-confidence {
+          color: #4caf50;
+          background: rgba(76, 175, 80, 0.1);
+        }
+
+        &.medium-confidence {
+          color: #ff9800;
+          background: rgba(255, 152, 0, 0.1);
+        }
+
+        &.low-confidence {
+          color: #f44336;
+          background: rgba(244, 67, 54, 0.1);
+        }
+      }
+    }
+  }
+}
+
+// État sans informations
+.no-movie-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  color: var(--app-text-secondary);
+  font-size: 1.1rem;
+  text-align: center;
+  justify-content: center;
+
+  mat-icon {
+    font-size: 32px;
+    opacity: 0.5;
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .movie-info-container {
+    flex-direction: column;
+    gap: 1.5rem;
+    padding: 1rem;
+
+    .movie-poster {
+      width: 120px;
+      height: 180px;
+      align-self: center;
+    }
+
+    .movie-details {
+      gap: 1rem;
+
+      .movie-header {
+        .title-section {
+          .movie-title {
+            font-size: 1.5rem;
+          }
+
+          .movie-year {
+            font-size: 1.1rem;
+          }
+        }
+      }
+
+      .rating-section {
+        gap: 1rem;
+
+        .rating {
+          .rating-value {
+            font-size: 1.1rem;
+          }
+
+          .rating-count {
+            font-size: 0.9rem;
+          }
+        }
+
+        .popularity {
+          font-size: 0.9rem;
+        }
+      }
+
+      .overview-section {
+        .movie-overview {
+          font-size: 0.9rem;
+        }
+      }
+
+      .metadata-section {
+        gap: 1rem;
+
+        .meta-item {
+          font-size: 0.9rem;
+          padding: 0.4rem 0.8rem;
+
+          mat-icon {
+            font-size: 16px;
+          }
+        }
+      }
+    }
+  }
+}

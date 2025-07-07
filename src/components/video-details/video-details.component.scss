@@ -1,0 +1,312 @@
+.video-details-container {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  margin-top: 1rem;
+  overflow: hidden;
+  transition: all 0.3s ease;
+
+  &:hover {
+    box-shadow: 0 4px 12px var(--app-shadow);
+  }
+
+  // En-tête
+  .details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--app-border);
+    background: var(--app-hover);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
+
+    h4 {
+      margin: 0;
+      color: var(--app-text-primary);
+      font-weight: 600;
+      font-size: 1.3rem;
+    }
+  }
+
+  // Détails techniques
+  .technical-details {
+    padding: 1.5rem;
+
+    h5 {
+      margin: 0 0 1rem 0;
+      color: var(--app-text-primary);
+      font-weight: 600;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      &::before {
+        content: "";
+        width: 4px;
+        height: 20px;
+        background: var(--mdc-filled-button-container-color, #1976d2);
+        border-radius: 2px;
+      }
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1rem;
+
+      .detail-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        background: var(--app-hover);
+        border-radius: 8px;
+        transition: all 0.3s ease;
+
+        &:hover {
+          background: var(--app-border);
+          transform: translateY(-1px);
+        }
+
+        strong {
+          color: var(--app-text-primary);
+          font-weight: 600;
+          font-size: 0.95rem;
+        }
+
+        span {
+          color: var(--app-text-secondary);
+          font-size: 0.9rem;
+          text-align: right;
+          word-break: break-word;
+          max-width: 60%;
+
+          &.file-path {
+            font-family: "Courier New", monospace;
+            font-size: 0.8rem;
+            opacity: 0.8;
+          }
+        }
+
+        &.error {
+          background: rgba(244, 67, 54, 0.1);
+          border-left: 4px solid #f44336;
+
+          strong {
+            color: #f44336;
+          }
+
+          .error-text {
+            color: #f44336;
+            font-weight: 500;
+          }
+        }
+      }
+    }
+  }
+
+  // Configuration de sortie
+  .output-config-section {
+    padding: 1.5rem;
+    border-top: 1px solid var(--app-border);
+    background: var(--app-surface);
+
+    h5 {
+      margin: 0 0 1rem 0;
+      color: var(--app-text-primary);
+      font-weight: 600;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      &::before {
+        content: "";
+        width: 4px;
+        height: 20px;
+        background: #2196f3;
+        border-radius: 2px;
+      }
+    }
+
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+
+      mat-form-field {
+        .full-width {
+          width: 100%;
+        }
+      }
+    }
+
+    .filename-section {
+      h6 {
+        margin: 0 0 1rem 0;
+        color: var(--app-text-primary);
+        font-weight: 600;
+        font-size: 1rem;
+      }
+
+      .filename-display {
+        .full-width {
+          width: 100%;
+        }
+
+        .file-path-display {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-top: 0.5rem;
+          padding: 0.75rem;
+          background: var(--app-hover);
+          border-radius: 8px;
+          color: var(--app-text-secondary);
+          font-size: 0.9rem;
+          font-family: "Courier New", monospace;
+
+          mat-icon {
+            font-size: 16px;
+            opacity: 0.7;
+          }
+        }
+      }
+    }
+  }
+
+  // Section optimisation
+  .optimization-section {
+    padding: 1.5rem;
+    border-top: 1px solid var(--app-border);
+    background: var(--app-surface);
+
+    h5 {
+      margin: 0 0 1rem 0;
+      color: var(--app-text-primary);
+      font-weight: 600;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      &::before {
+        content: "";
+        width: 4px;
+        height: 20px;
+        background: #4caf50;
+        border-radius: 2px;
+      }
+    }
+
+    .optimization-options {
+      mat-chip-set {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+
+        mat-chip {
+          mat-icon {
+            font-size: 18px;
+            margin-right: 6px;
+          }
+        }
+      }
+    }
+  }
+}
+
+// État sans sélection
+.no-selection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--app-text-secondary);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  margin-top: 1rem;
+
+  mat-icon {
+    font-size: 48px;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  p {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--app-text-secondary);
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .video-details-container {
+    .details-header {
+      padding: 1rem;
+
+      h4 {
+        font-size: 1.1rem;
+      }
+    }
+
+    .technical-details {
+      padding: 1rem;
+
+      .details-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+
+        .detail-item {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0.5rem;
+
+          span {
+            max-width: 100%;
+            text-align: left;
+          }
+        }
+      }
+    }
+
+    .output-config-section {
+      padding: 1rem;
+
+      .config-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+      }
+
+      .filename-section {
+        .file-path-display {
+          font-size: 0.8rem;
+        }
+      }
+    }
+
+    .optimization-section {
+      padding: 1rem;
+
+      .optimization-options {
+        mat-chip-set {
+          gap: 0.5rem;
+
+          mat-chip {
+            font-size: 0.9rem;
+
+            mat-icon {
+              font-size: 16px;
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,56 @@
+<div class="movie-alternatives-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>movie</mat-icon>
+    Sélectionner un film/série
+  </h2>
+
+  <mat-dialog-content>
+    <div class="search-info">
+      <p>Résultats pour : <strong>{{ movieResults().originalQuery }}</strong></p>
+      <p>{{ movieResults().alternatives.length }} résultat(s) trouvé(s)</p>
+    </div>
+
+    <div class="alternatives-grid">
+      @for (movie of movieResults().alternatives; track movie.tmdbId) {
+        <mat-card 
+          class="movie-card" 
+          [class.selected]="selectedMovie().tmdbId === movie.tmdbId"
+          (click)="onSelectMovie(movie)">
+          
+          <div class="movie-poster">
+            <img [src]="getPosterUrl(movie.posterPath)" [alt]="movie.title">
+            @if (selectedMovie().tmdbId === movie.tmdbId) {
+              <div class="selected-overlay">
+                <mat-icon>check_circle</mat-icon>
+              </div>
+            }
+          </div>
+
+          <mat-card-content>
+            <h3 class="movie-title">{{ movie.title }}</h3>
+            @if (movie.year) {
+              <p class="movie-year">{{ movie.year }}</p>
+            }
+            @if (movie.voteAverage) {
+              <div class="movie-rating">
+                <mat-icon>star</mat-icon>
+                <span>{{ movie.voteAverage.toFixed(1) }}</span>
+              </div>
+            }
+            @if (movie.overview) {
+              <p class="movie-overview">{{ movie.overview | slice:0:100 }}{{ movie.overview.length > 100 ? '...' : '' }}</p>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="onCancel()">Annuler</button>
+    <button mat-raised-button (click)="onConfirm()" color="primary">
+      <mat-icon>check</mat-icon>
+      Confirmer
+    </button>
+  </mat-dialog-actions>
+</div> 
