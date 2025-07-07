@@ -17,20 +17,55 @@
           </td>
         </ng-container>
 
-              <!-- Taille du fichier -->
-      <ng-container matColumnDef="size">
-        <th mat-header-cell *matHeaderCellDef>Taille</th>
-        <td mat-cell *matCellDef="let video">
-          <div class="file-size-container">
-            <span class="file-size" *ngIf="!video.loading">{{ formatFileSize(video.size || 0) }}</span>
-            <div class="loading-indicator" *ngIf="video.loading">
-              <mat-progress-spinner mode="indeterminate" diameter="16"></mat-progress-spinner>
-              <span>Chargement...</span>
+        <!-- Taille du fichier -->
+        <ng-container matColumnDef="size">
+          <th mat-header-cell *matHeaderCellDef>Taille</th>
+          <td mat-cell *matCellDef="let video">
+            <div class="file-size-container">
+              <span class="file-size" *ngIf="!video.loading">{{ formatFileSize(video.size || 0) }}</span>
+              <div class="loading-indicator" *ngIf="video.loading">
+                <mat-progress-spinner mode="indeterminate" diameter="16"></mat-progress-spinner>
+                <span>Chargement...</span>
+              </div>
+              <span class="error-text" *ngIf="video.error && !video.loading">{{ video.error }}</span>
             </div>
-            <span class="error-text" *ngIf="video.error && !video.loading">{{ video.error }}</span>
-          </div>
-        </td>
-      </ng-container>
+          </td>
+        </ng-container>
+
+        <!-- Titre du film/série -->
+        <ng-container matColumnDef="movieTitle">
+          <th mat-header-cell *matHeaderCellDef>Titre du film/série</th>
+          <td mat-cell *matCellDef="let video">
+            <div class="movie-info">
+              @if (video.movieInfoLoading) {
+                <div class="loading-indicator">
+                  <mat-progress-spinner mode="indeterminate" diameter="16"></mat-progress-spinner>
+                  <span>Recherche...</span>
+                </div>
+              } @else if (video.movieInfo) {
+                <div class="movie-details">
+                  <div class="movie-title">
+                    <mat-icon class="movie-icon">
+                      {{ video.movieInfo.type === 'tv' ? 'tv' : 'movie' }}
+                    </mat-icon>
+                    <span class="title">{{ video.movieInfo.title }}</span>
+                    @if (video.movieInfo.year) {
+                      <span class="year">({{ video.movieInfo.year }})</span>
+                    }
+                  </div>
+                  @if (video.movieInfo.confidence < 0.7) {
+                    <div class="confidence-warning">
+                      <mat-icon>warning</mat-icon>
+                      <span>Confiance faible</span>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <span class="no-info">Aucune information</span>
+              }
+            </div>
+          </td>
+        </ng-container>
 
         <!-- Actions -->
         <ng-container matColumnDef="actions">

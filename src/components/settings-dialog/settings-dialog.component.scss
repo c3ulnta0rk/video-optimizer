@@ -1,0 +1,82 @@
+.settings-dialog {
+  min-width: 400px;
+  max-width: 500px;
+
+  h2[mat-dialog-title] {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 16px 24px 0;
+
+    mat-icon {
+      color: var(--mdc-filled-button-container-color, #1976d2);
+    }
+  }
+
+  mat-dialog-content {
+    padding: 16px 24px;
+
+    .settings-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+
+      .full-width {
+        width: 100%;
+      }
+
+      mat-hint {
+        font-size: 12px;
+
+        a {
+          color: var(--mdc-filled-button-container-color, #1976d2);
+          text-decoration: none;
+
+          &:hover {
+            text-decoration: underline;
+          }
+        }
+      }
+    }
+  }
+
+  mat-dialog-actions {
+    padding: 8px 24px 16px;
+    gap: 8px;
+
+    button {
+      min-width: 80px;
+
+      mat-icon {
+        margin-right: 4px;
+      }
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 600px) {
+  .settings-dialog {
+    min-width: 300px;
+    max-width: 90vw;
+
+    h2[mat-dialog-title] {
+      padding: 12px 16px 0;
+    }
+
+    mat-dialog-content {
+      padding: 12px 16px;
+    }
+
+    mat-dialog-actions {
+      padding: 8px 16px 12px;
+      flex-wrap: wrap;
+
+      button {
+        flex: 1;
+        min-width: auto;
+      }
+    }
+  }
+}

@@ -1,6 +1,11 @@
 <mat-toolbar class="justify-between">
   <span>Video Optimizer</span>
-  <app-files-selector />
+  <div class="toolbar-actions">
+    <app-files-selector />
+    <button mat-icon-button (click)="openSettings()" matTooltip="Paramètres">
+      <mat-icon>settings</mat-icon>
+    </button>
+  </div>
 </mat-toolbar>
 
 <app-videos-table 

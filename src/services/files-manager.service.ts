@@ -1,7 +1,12 @@
-import { effect, Injectable, signal } from "@angular/core";
+import { effect, inject, Injectable, signal } from "@angular/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readDir } from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  MovieTitleParserService,
+  MovieInfo,
+} from "./movie-title-parser.service";
+import { firstValueFrom } from "rxjs";
 
 export interface VideoFile {
   path: string;
@@ -14,6 +19,8 @@ export interface VideoFile {
   fps?: number;
   error?: string;
   loading: boolean;
+  movieInfo?: MovieInfo;
+  movieInfoLoading?: boolean;
 }
 
 @Injectable({
@@ -25,14 +32,17 @@ export class FilesManagerService {
   public readonly selectedVideo = signal<VideoFile | null>(null);
   public readonly directory = signal<boolean>(false);
 
+  private readonly movieParser = inject(MovieTitleParserService);
+
   constructor() {
     effect(() => {
-      console.log("Videos paths updated:", this.videosPaths());
-      this.updateVideoFiles();
-    });
+      // Mettre à jour la liste des fichiers
+      this.videoFiles.set(this.convertPathsToVideoFiles(this.videosPaths()));
 
-    effect(() => {
-      console.log("Selected video:", this.selectedVideo());
+      // Charger automatiquement les infos du film après un délai
+      setTimeout(() => {
+        this.loadAllMovieInfo();
+      }, 200); // Délai plus long pour laisser le temps aux métadonnées de se charger
     });
   }
 
@@ -60,8 +70,6 @@ export class FilesManagerService {
     if (this.selectedVideo()?.path === videoPath) {
       this.selectedVideo.set(null);
     }
-
-    console.log("Vidéo supprimée:", videoPath);
   }
 
   /**
@@ -69,7 +77,6 @@ export class FilesManagerService {
    */
   public selectVideo(video: VideoFile | null) {
     this.selectedVideo.set(video);
-    console.log("Vidéo sélectionnée:", video);
   }
 
   /**
@@ -77,6 +84,7 @@ export class FilesManagerService {
    */
   private updateVideoFiles() {
     this.videoFiles.set(this.convertPathsToVideoFiles(this.videosPaths()));
+    // Cette méthode n'est plus nécessaire car l'effect s'en charge
   }
 
   /**
@@ -296,6 +304,63 @@ export class FilesManagerService {
     } catch (error) {
       console.error("Erreur lors de la vérification de ffprobe:", error);
       return false;
+    }
+  }
+
+  /**
+   * Charge les informations du film pour un fichier vidéo
+   */
+  public async loadMovieInfo(filePath: string): Promise<void> {
+    const currentFiles = this.videoFiles();
+    const fileIndex = currentFiles.findIndex((f) => f.path === filePath);
+
+    if (fileIndex === -1) return;
+
+    // Marquer comme en cours de chargement
+    const updatedFiles = [...currentFiles];
+    updatedFiles[fileIndex] = {
+      ...updatedFiles[fileIndex],
+      movieInfoLoading: true,
+    };
+    this.videoFiles.set(updatedFiles);
+
+    try {
+      const fileName = this.extractFileName(filePath);
+      const movieInfo = await firstValueFrom(
+        this.movieParser.parseMovieTitle(fileName)
+      );
+
+      console.log("Movie info:", movieInfo);
+
+      // Mettre à jour avec les infos du film
+      const finalFiles = [...this.videoFiles()];
+      finalFiles[fileIndex] = {
+        ...finalFiles[fileIndex],
+        movieInfo,
+        movieInfoLoading: false,
+      };
+      this.videoFiles.set(finalFiles);
+    } catch (error) {
+      console.error("Erreur lors du chargement des infos du film:", error);
+
+      // Marquer comme terminé même en cas d'erreur
+      const errorFiles = [...this.videoFiles()];
+      errorFiles[fileIndex] = {
+        ...errorFiles[fileIndex],
+        movieInfoLoading: false,
+      };
+      this.videoFiles.set(errorFiles);
+    }
+  }
+
+  /**
+   * Charge les informations du film pour tous les fichiers
+   */
+  public async loadAllMovieInfo(): Promise<void> {
+    const currentFiles = this.videoFiles();
+
+    for (const file of currentFiles) {
+      await this.loadMovieInfo(file.path);
     }
   }
 }

@@ -1,0 +1,52 @@
+<div class="settings-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>settings</mat-icon>
+    Paramètres
+  </h2>
+
+  <mat-dialog-content>
+    <div class="settings-form">
+      <!-- Clé API TMDB -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Clé API The Movie Database</mat-label>
+        <input 
+          matInput 
+          [(ngModel)]="settings().tmdbApiKey" 
+          placeholder="Entrez votre clé API TMDB"
+          type="password"
+        />
+        <mat-hint>
+          Obtenez votre clé API gratuite sur 
+          <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">
+            themoviedb.org
+          </a>
+        </mat-hint>
+      </mat-form-field>
+
+      <!-- Préférences de thème -->
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Thème</mat-label>
+        <mat-select [(ngModel)]="settings().theme">
+          <mat-option value="auto">Auto (système)</mat-option>
+          <mat-option value="light">Clair</mat-option>
+          <mat-option value="dark">Sombre</mat-option>
+        </mat-select>
+        <mat-hint>Choisissez votre préférence de thème</mat-hint>
+      </mat-form-field>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="onReset()" color="warn">
+      <mat-icon>restore</mat-icon>
+      Réinitialiser
+    </button>
+    <button mat-button (click)="onCancel()">
+      Annuler
+    </button>
+    <button mat-raised-button (click)="onSave()" color="primary">
+      <mat-icon>save</mat-icon>
+      Enregistrer
+    </button>
+  </mat-dialog-actions>
+</div> 

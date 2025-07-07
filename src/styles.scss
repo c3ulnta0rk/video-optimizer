@@ -109,3 +109,14 @@ body {
   color: var(--app-text-primary) !important;
   border: 1px solid var(--app-border) !important;
 }
+
+// Fix pour le conflit Tailwind CSS / Angular Material
+// Solution basée sur : https://github.com/tailwindlabs/tailwindcss/discussions/9993
+.mat-mdc-form-field.mat-mdc-form-field.mat-mdc-form-field.mat-mdc-form-field.mat-mdc-form-field
+  .mdc-notched-outline__notch {
+  border-right-style: hidden;
+}
+
+.mat-mdc-input-element {
+  box-shadow: none !important;
+}
