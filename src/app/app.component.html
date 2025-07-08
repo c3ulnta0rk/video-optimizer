@@ -1,10 +1,11 @@
 <!-- Appbar personnalisée -->
-<app-custom-appbar></app-custom-appbar>
+<app-advanced-appbar
+  (filesSelected)="onFilesSelect()"
+  (settingsClicked)="onSettingsClick()"
+  (toggleTheme)="onToggleTheme()"
+></app-advanced-appbar>
 
 <!-- Contenu principal -->
 <div class="main-content">
-  <app-videos-table
-    (videoSelected)="onVideoSelected($event)"
-    (videoRemoved)="onVideoRemoved($event)"
-  />
+  <app-videos-table />
 </div>

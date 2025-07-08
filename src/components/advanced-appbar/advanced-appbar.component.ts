@@ -1,17 +1,33 @@
 import { Component, OnInit, output, signal } from "@angular/core";
 import { invoke } from "@tauri-apps/api/core";
+import { TrayService } from "../../services/tray.service";
+import { FilesSelectorComponent } from "../files-selector/files-selector.component";
+import { MatSlideToggleModule } from "@angular/material/slide-toggle";
+import { MatButtonModule } from "@angular/material/button";
+import { MatIconModule } from "@angular/material/icon";
+import { MatTooltipModule } from "@angular/material/tooltip";
 
 @Component({
   selector: "app-advanced-appbar",
   templateUrl: "./advanced-appbar.component.html",
   styleUrls: ["./advanced-appbar.component.scss"],
+  imports: [
+    FilesSelectorComponent,
+    MatSlideToggleModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule,
+  ],
 })
 export class AdvancedAppbarComponent implements OnInit {
   public readonly settingsClicked = output<void>();
   public readonly filesSelected = output<void>();
+  public readonly toggleTheme = output<void>();
 
   public readonly isMaximized = signal(false);
   public readonly isMenuOpen = signal(false);
+
+  constructor(private trayService: TrayService) {}
 
   ngOnInit(): void {
     this.checkWindowState();
@@ -27,7 +43,7 @@ export class AdvancedAppbarComponent implements OnInit {
   }
 
   async closeWindow(): Promise<void> {
-    await invoke("close_window");
+    await this.trayService.hideToTray();
   }
 
   private async checkWindowState(): Promise<void> {
@@ -57,5 +73,9 @@ export class AdvancedAppbarComponent implements OnInit {
 
   onFilesSelect(): void {
     this.filesSelected.emit();
+  }
+
+  onToggleTheme(): void {
+    this.toggleTheme.emit();
   }
 }

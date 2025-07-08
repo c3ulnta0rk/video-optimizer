@@ -10,6 +10,7 @@
   ],
   "permissions": [
     "window-state:default",
-    "store:default"
+    "store:default",
+    "core:tray:allow-new"
   ]
 }

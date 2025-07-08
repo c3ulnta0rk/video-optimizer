@@ -31,7 +31,6 @@ export class CustomAppbarComponent implements OnInit {
     const currentWindow = await getCurrentWindow();
     currentWindow.setDecorations(false);
     currentWindow.setShadow(true);
-    currentWindow.setSize(new LogicalSize(600, 500));
   }
 
   // Gestion du déplacement de la fenêtre

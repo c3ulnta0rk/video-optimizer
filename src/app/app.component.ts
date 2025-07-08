@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewEncapsulation } from "@angular/core";
+import { Component, inject, OnInit, ViewEncapsulation } from "@angular/core";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MatToolbarModule } from "@angular/material/toolbar";
@@ -8,7 +8,7 @@ import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { VideosTableComponent } from "../components/videos-table/videos-table.component";
 import { SettingsDialogComponent } from "../components/settings-dialog/settings-dialog.component";
-import { CustomAppbarComponent } from "../components/custom-appbar/custom-appbar.component";
+import { AdvancedAppbarComponent } from "../components/advanced-appbar/advanced-appbar.component";
 import {
   FilesManagerService,
   VideoFile,
@@ -24,20 +24,17 @@ import { SettingsService } from "../services/settings.service";
     MatTooltipModule,
     MatDialogModule,
     VideosTableComponent,
-    CustomAppbarComponent,
+    AdvancedAppbarComponent,
   ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.scss",
   encapsulation: ViewEncapsulation.None,
 })
 export class AppComponent implements OnInit {
+  private readonly filesManager = inject(FilesManagerService);
+  private readonly settingsService = inject(SettingsService);
+  private readonly dialog = inject(MatDialog);
   public readonly selectedVideo = this.filesManager.selectedVideo;
-
-  constructor(
-    private filesManager: FilesManagerService,
-    private settingsService: SettingsService,
-    private dialog: MatDialog
-  ) {}
 
   ngOnInit(): void {
     // Détection initiale
@@ -81,12 +78,15 @@ export class AppComponent implements OnInit {
     }
   }
 
-  public onVideoSelected(video: VideoFile): void {
-    console.log("Vidéo sélectionnée dans AppComponent:", video);
+  onSettingsClick() {
+    this.openSettings();
+  }
+  onFilesSelect() {
+    this.filesManager.selectFiles();
   }
 
-  public onVideoRemoved(videoPath: string): void {
-    console.log("Vidéo supprimée dans AppComponent:", videoPath);
+  onToggleTheme() {
+    this.settingsService.toggleTheme();
   }
 
   public openSettings(): void {

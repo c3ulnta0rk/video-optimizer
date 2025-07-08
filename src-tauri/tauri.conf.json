@@ -12,11 +12,16 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Video Optimizer",
         "decorations": false,
         "transparent": true
       }
     ],
+    "trayIcon": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": true
+    },
     "security": {
       "csp": null
     }

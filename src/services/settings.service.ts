@@ -101,4 +101,10 @@ export class SettingsService {
   async setTheme(theme: "light" | "dark" | "auto"): Promise<void> {
     await this.updateSettings({ theme });
   }
+
+  toggleTheme() {
+    const currentTheme = this.getTheme();
+    const newTheme = currentTheme === "light" ? "dark" : "light";
+    this.setTheme(newTheme);
+  }
 }

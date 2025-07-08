@@ -1,5 +1,6 @@
 mod video_commands;
 mod window_commands;
+mod tray_commands;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -21,6 +22,9 @@ pub fn run() {
             window_commands::close_window,
             window_commands::start_dragging,
             window_commands::is_maximized,
+            tray_commands::show_window,
+            tray_commands::hide_window,
+            tray_commands::quit_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
