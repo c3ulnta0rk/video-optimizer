@@ -1,6 +1,5 @@
 import { Component, OnInit, output, signal } from "@angular/core";
 import { invoke } from "@tauri-apps/api/core";
-import { TrayService } from "../../services/tray.service";
 import { FilesSelectorComponent } from "../files-selector/files-selector.component";
 import { MatSlideToggleModule } from "@angular/material/slide-toggle";
 import { MatButtonModule } from "@angular/material/button";
@@ -27,8 +26,6 @@ export class AdvancedAppbarComponent implements OnInit {
   public readonly isMaximized = signal(false);
   public readonly isMenuOpen = signal(false);
 
-  constructor(private trayService: TrayService) {}
-
   ngOnInit(): void {
     this.checkWindowState();
   }
@@ -43,7 +40,7 @@ export class AdvancedAppbarComponent implements OnInit {
   }
 
   async closeWindow(): Promise<void> {
-    await this.trayService.hideToTray();
+    await invoke("close_window");
   }
 
   private async checkWindowState(): Promise<void> {
