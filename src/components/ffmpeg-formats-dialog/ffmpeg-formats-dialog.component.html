@@ -1,0 +1,167 @@
+<div class="ffmpeg-formats-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>video_file</mat-icon>
+    Formats de sortie FFmpeg
+  </h2>
+
+  <mat-dialog-content>
+    <!-- État de chargement -->
+    <div *ngIf="ffmpegInfo().loading" class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Vérification des formats FFmpeg...</p>
+    </div>
+
+    <!-- Erreur -->
+    <div *ngIf="ffmpegInfo().error" class="error-container">
+      <mat-icon color="warn">error</mat-icon>
+      <p>{{ ffmpegInfo().error }}</p>
+      <button mat-raised-button color="primary" (click)="refreshFormats()">
+        <mat-icon>refresh</mat-icon>
+        Réessayer
+      </button>
+    </div>
+
+    <!-- Contenu principal -->
+    <div *ngIf="!ffmpegInfo().loading && !ffmpegInfo().error">
+      <!-- Barre de recherche -->
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Rechercher un format</mat-label>
+        <input
+          matInput
+          [(ngModel)]="searchQuery"
+          placeholder="Ex: mp4, webm, mov..."
+        />
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <!-- Onglets -->
+      <mat-tab-group [(selectedIndex)]="selectedTab" class="formats-tabs">
+        <!-- Onglet Formats courants -->
+        <mat-tab label="Courants">
+          <div class="formats-grid">
+            <mat-card
+              *ngFor="let format of getCommonFormats()"
+              class="format-card"
+              [class.selectable]="isFormatSelectable(format)"
+              (click)="isFormatSelectable(format) ? selectFormat(format) : null"
+            >
+              <mat-card-header>
+                <mat-card-title>{{ format.name.toUpperCase() }}</mat-card-title>
+                <mat-card-subtitle>{{ format.description }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="extensions">
+                  <mat-chip
+                    *ngFor="let ext of format.extensions"
+                    color="primary"
+                    variant="outlined"
+                  >
+                    .{{ ext }}
+                  </mat-chip>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </mat-tab>
+
+        <!-- Onglet Haute qualité -->
+        <mat-tab label="Haute qualité">
+          <div class="formats-grid">
+            <mat-card
+              *ngFor="let format of getHighQualityFormats()"
+              class="format-card"
+              [class.selectable]="isFormatSelectable(format)"
+              (click)="isFormatSelectable(format) ? selectFormat(format) : null"
+            >
+              <mat-card-header>
+                <mat-card-title>{{ format.name.toUpperCase() }}</mat-card-title>
+                <mat-card-subtitle>{{ format.description }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="extensions">
+                  <mat-chip
+                    *ngFor="let ext of format.extensions"
+                    color="accent"
+                    variant="outlined"
+                  >
+                    .{{ ext }}
+                  </mat-chip>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </mat-tab>
+
+        <!-- Onglet Mobile -->
+        <mat-tab label="Mobile">
+          <div class="formats-grid">
+            <mat-card
+              *ngFor="let format of getMobileFormats()"
+              class="format-card"
+              [class.selectable]="isFormatSelectable(format)"
+              (click)="isFormatSelectable(format) ? selectFormat(format) : null"
+            >
+              <mat-card-header>
+                <mat-card-title>{{ format.name.toUpperCase() }}</mat-card-title>
+                <mat-card-subtitle>{{ format.description }}</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content>
+                <div class="extensions">
+                  <mat-chip
+                    *ngFor="let ext of format.extensions"
+                    color="warn"
+                    variant="outlined"
+                  >
+                    .{{ ext }}
+                  </mat-chip>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </mat-tab>
+
+        <!-- Onglet Tous les formats -->
+        <mat-tab label="Tous">
+          <div class="formats-list">
+            <mat-list>
+              <mat-list-item
+                *ngFor="let format of getFilteredFormats()"
+                [class.selectable]="isFormatSelectable(format)"
+                (click)="
+                  isFormatSelectable(format) ? selectFormat(format) : null
+                "
+              >
+                <div matListItemTitle>{{ format.name.toUpperCase() }}</div>
+                <div matListItemLine>{{ format.description }}</div>
+                <div matListItemMeta>
+                  <mat-chip-set>
+                    <mat-chip
+                      *ngFor="let ext of format.extensions"
+                      variant="outlined"
+                      size="small"
+                    >
+                      .{{ ext }}
+                    </mat-chip>
+                  </mat-chip-set>
+                </div>
+              </mat-list-item>
+            </mat-list>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+
+      <!-- Statistiques -->
+      <div class="stats">
+        <p>{{ ffmpegInfo().formats.length }} formats disponibles</p>
+      </div>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="close()">Fermer</button>
+    <button mat-raised-button color="primary" (click)="refreshFormats()">
+      <mat-icon>refresh</mat-icon>
+      Actualiser
+    </button>
+  </mat-dialog-actions>
+</div>

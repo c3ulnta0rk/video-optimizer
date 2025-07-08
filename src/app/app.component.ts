@@ -9,6 +9,7 @@ import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { VideosTableComponent } from "../components/videos-table/videos-table.component";
 import { SettingsDialogComponent } from "../components/settings-dialog/settings-dialog.component";
 import { AdvancedAppbarComponent } from "../components/advanced-appbar/advanced-appbar.component";
+
 import {
   FilesManagerService,
   VideoFile,
@@ -89,6 +90,10 @@ export class AppComponent implements OnInit {
     this.settingsService.toggleTheme();
   }
 
+  onFfmpegFormatsClick() {
+    this.openFfmpegFormatsDialog();
+  }
+
   public openSettings(): void {
     const dialogRef = this.dialog.open(SettingsDialogComponent, {
       width: "500px",
@@ -100,6 +105,16 @@ export class AppComponent implements OnInit {
     dialogRef.afterClosed().subscribe((result) => {
       if (result) {
         console.log("Paramètres mis à jour:", result);
+      }
+    });
+  }
+
+  public openFfmpegFormatsDialog(): void {
+    this.filesManager.openFfmpegFormatsDialog().then((selectedFormat) => {
+      if (selectedFormat) {
+        console.log("Format sélectionné:", selectedFormat);
+        // Ici vous pouvez ajouter la logique pour utiliser le format sélectionné
+        // Par exemple, l'ajouter aux paramètres de conversion
       }
     });
   }

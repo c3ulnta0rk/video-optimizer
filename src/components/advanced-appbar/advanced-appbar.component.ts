@@ -22,6 +22,7 @@ export class AdvancedAppbarComponent implements OnInit {
   public readonly settingsClicked = output<void>();
   public readonly filesSelected = output<void>();
   public readonly toggleTheme = output<void>();
+  public readonly ffmpegFormatsClicked = output<void>();
 
   public readonly isMaximized = signal(false);
   public readonly isMenuOpen = signal(false);
@@ -74,5 +75,9 @@ export class AdvancedAppbarComponent implements OnInit {
 
   onToggleTheme(): void {
     this.toggleTheme.emit();
+  }
+
+  onFfmpegFormatsClick(): void {
+    this.ffmpegFormatsClicked.emit();
   }
 }

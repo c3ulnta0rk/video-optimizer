@@ -2,11 +2,14 @@ import { effect, inject, Injectable, signal } from "@angular/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readDir } from "@tauri-apps/plugin-fs";
 import { invoke } from "@tauri-apps/api/core";
+import { MatDialog } from "@angular/material/dialog";
 import {
   MovieTitleParserService,
   MovieInfo,
   MovieSearchResult,
 } from "./movie-title-parser.service";
+import { FfmpegFormatsService, FfmpegFormat } from "./ffmpeg-formats.service";
+import { FfmpegFormatsDialogComponent } from "../components/ffmpeg-formats-dialog/ffmpeg-formats-dialog.component";
 import { firstValueFrom } from "rxjs";
 
 export interface VideoFile {
@@ -35,6 +38,8 @@ export class FilesManagerService {
   public readonly directory = signal<boolean>(false);
 
   private readonly movieParser = inject(MovieTitleParserService);
+  private readonly dialog = inject(MatDialog);
+  private readonly ffmpegService = inject(FfmpegFormatsService);
 
   constructor() {
     effect(() => {
@@ -409,5 +414,34 @@ export class FilesManagerService {
       movieInfo,
     };
     this.videoFiles.set(updatedFiles);
+  }
+
+  /**
+   * Ouvre le dialogue des formats FFmpeg disponibles
+   */
+  public openFfmpegFormatsDialog(): Promise<FfmpegFormat | undefined> {
+    const dialogRef = this.dialog.open(FfmpegFormatsDialogComponent, {
+      width: "800px",
+      maxWidth: "90vw",
+      maxHeight: "80vh",
+      disableClose: false,
+      data: {},
+    });
+
+    return dialogRef.afterClosed().toPromise();
+  }
+
+  /**
+   * Vérifie si un format de sortie est supporté par FFmpeg
+   */
+  public isOutputFormatSupported(formatName: string): boolean {
+    return this.ffmpegService.isFormatSupported(formatName);
+  }
+
+  /**
+   * Récupère les formats de sortie courants
+   */
+  public getCommonOutputFormats(): FfmpegFormat[] {
+    return this.ffmpegService.getCommonVideoFormats();
   }
 }

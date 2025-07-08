@@ -164,6 +164,126 @@ fn get_ffprobe_metadata(path: &Path) -> Result<VideoMetadata, String> {
     })
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FfmpegFormat {
+    pub name: String,
+    pub description: String,
+    pub extensions: Vec<String>,
+}
+
+#[command]
+pub async fn get_ffmpeg_output_formats() -> Result<Vec<FfmpegFormat>, String> {
+    let output = Command::new("ffmpeg")
+        .args(&["-formats"])
+        .output()
+        .map_err(|e| format!("Failed to execute ffmpeg: {}", e))?;
+
+    if !output.status.success() {
+        return Err("ffmpeg command failed".to_string());
+    }
+
+    let output_str = String::from_utf8(output.stdout)
+        .map_err(|e| format!("Failed to parse ffmpeg output: {}", e))?;
+
+    parse_formats_output(&output_str)
+}
+
+fn parse_formats_output(output: &str) -> Result<Vec<FfmpegFormat>, String> {
+    let mut formats = Vec::new();
+    let lines: Vec<&str> = output.lines().collect();
+    
+    // Chercher la section des formats de sortie (commence par "File formats:")
+    let mut in_formats_section = false;
+    
+    for line in lines {
+        let line = line.trim();
+        
+        if line.starts_with("File formats:") {
+            in_formats_section = true;
+            continue;
+        }
+        
+        if !in_formats_section || line.is_empty() {
+            continue;
+        }
+        
+        // Les lignes de formats commencent par " E " (espace + E + espace pour les formats de sortie)
+        // ou "DE " (pour les formats qui supportent les deux)
+        if line.starts_with(" E ") || line.starts_with("DE ") {
+            if let Some(format_info) = parse_format_line(line) {
+                formats.push(format_info);
+            }
+        }
+    }
+    
+    println!("Formats trouvés: {}", formats.len());
+    Ok(formats)
+}
+
+fn parse_format_line(line: &str) -> Option<FfmpegFormat> {
+    // Format de ligne: " E  format_name    description" ou "DE  format_name    description"
+    let parts: Vec<&str> = line.split_whitespace().collect();
+    
+    if parts.len() < 3 {
+        return None;
+    }
+    
+    let name = parts[1].to_string();
+    let description = parts[2..].join(" ");
+    
+    // Extraire les extensions courantes pour ce format
+    let extensions = get_format_extensions(&name);
+    
+    Some(FfmpegFormat {
+        name,
+        description,
+        extensions,
+    })
+}
+
+fn get_format_extensions(format_name: &str) -> Vec<String> {
+    // Mapping des formats vers leurs extensions courantes
+    match format_name.to_lowercase().as_str() {
+        "mp4" => vec!["mp4".to_string()],
+        "mov" => vec!["mov".to_string()],
+        "avi" => vec!["avi".to_string()],
+        "mkv" => vec!["mkv".to_string()],
+        "webm" => vec!["webm".to_string()],
+        "flv" => vec!["flv".to_string()],
+        "wmv" => vec!["wmv".to_string()],
+        "m4v" => vec!["m4v".to_string()],
+        "3gp" => vec!["3gp".to_string()],
+        "ogv" => vec!["ogv".to_string()],
+        "ts" => vec!["ts".to_string()],
+        "mts" => vec!["mts".to_string()],
+        "m2ts" => vec!["m2ts".to_string()],
+        "vob" => vec!["vob".to_string()],
+        "asf" => vec!["asf".to_string()],
+        "rm" => vec!["rm".to_string()],
+        "rmvb" => vec!["rmvb".to_string()],
+        "divx" => vec!["divx".to_string()],
+        "xvid" => vec!["avi".to_string()],
+        "h264" => vec!["mp4".to_string(), "mkv".to_string()],
+        "hevc" => vec!["mp4".to_string(), "mkv".to_string()],
+        "vp8" => vec!["webm".to_string()],
+        "vp9" => vec!["webm".to_string()],
+        "av1" => vec!["mp4".to_string(), "mkv".to_string()],
+        _ => vec![format_name.to_string()],
+    }
+}
+
+#[command]
+pub async fn check_ffmpeg_available() -> Result<bool, String> {
+    let output = Command::new("ffmpeg")
+        .arg("-version")
+        .output();
+
+    match output {
+        Ok(output) => Ok(output.status.success()),
+        Err(_) => Ok(false),
+    }
+}
+
 #[command]
 pub async fn check_ffprobe_available() -> Result<bool, String> {
     let output = Command::new("ffprobe")
