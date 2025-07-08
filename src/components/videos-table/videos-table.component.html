@@ -134,10 +134,11 @@
       </p>
     </div>
   </ng-template>
-  }
+  } @if (selectedVideo()) {
   <app-video-details
-    [selectedVideo]="selectedVideo()"
+    [selectedVideo]="selectedVideo()!"
     (closeDetails)="onCloseDetails()"
   >
   </app-video-details>
+  }
 </div>

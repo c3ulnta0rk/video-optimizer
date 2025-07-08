@@ -1,10 +1,12 @@
 import { Injectable } from "@angular/core";
 import { BehaviorSubject, Observable } from "rxjs";
 import { Store, load } from "@tauri-apps/plugin-store";
+import { OutputFileConfig } from "./filename-generator.service";
 
 export interface AppSettings {
   tmdbApiKey: string;
   theme: "light" | "dark" | "auto";
+  videoConfig: OutputFileConfig;
 }
 
 @Injectable({
@@ -37,6 +39,14 @@ export class SettingsService {
     return {
       tmdbApiKey: "",
       theme: "auto",
+      videoConfig: {
+        format: "mkv",
+        quality: "1080p",
+        codec: "h265",
+        audio: "aac",
+        crf: 20,
+        group: "VideoOptimizer",
+      },
     };
   }
 
@@ -100,6 +110,20 @@ export class SettingsService {
 
   async setTheme(theme: "light" | "dark" | "auto"): Promise<void> {
     await this.updateSettings({ theme });
+  }
+
+  getVideoConfig(): OutputFileConfig {
+    return this.getSettings().videoConfig;
+  }
+
+  async setVideoConfig(config: OutputFileConfig): Promise<void> {
+    await this.updateSettings({ videoConfig: config });
+  }
+
+  async updateVideoConfig(updates: Partial<OutputFileConfig>): Promise<void> {
+    const currentConfig = this.getVideoConfig();
+    const newConfig = { ...currentConfig, ...updates };
+    await this.setVideoConfig(newConfig);
   }
 
   toggleTheme() {

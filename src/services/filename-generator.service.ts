@@ -6,6 +6,7 @@ export interface OutputFileConfig {
   quality: "1080p" | "720p" | "480p" | "4K";
   codec: "h264" | "h265" | "vp9";
   audio: "aac" | "ac3" | "mp3" | "opus";
+  crf: number; // Taux de compression (0-51, 20 par défaut)
   group?: string;
 }
 
@@ -77,10 +78,6 @@ export class FilenameGeneratorService {
     // Codec audio
     const audioLabel = this.getAudioLabel(config.audio);
     parts.push(audioLabel);
-
-    // Groupe
-    const group = config.group || this.DEFAULT_GROUP;
-    parts.push(group);
 
     return parts.join(".");
   }
@@ -160,9 +157,9 @@ export class FilenameGeneratorService {
       case "4K":
         return "h265"; // Meilleure compression pour 4K
       case "1080p":
-        return "h264"; // Standard pour 1080p
+        return "h265"; // H.265 par défaut pour 1080p aussi
       default:
-        return "h264"; // Compatibilité maximale
+        return "h265"; // H.265 par défaut pour tout
     }
   }
 
@@ -193,10 +190,11 @@ export class FilenameGeneratorService {
     const audioCodec = this.suggestAudioCodec(quality);
 
     return {
-      format: "mp4", // Format le plus compatible
+      format: "mkv", // Format MKV par défaut
       quality,
       codec: videoCodec,
       audio: audioCodec,
+      crf: 20, // Taux de compression par défaut
       group: this.DEFAULT_GROUP,
     };
   }

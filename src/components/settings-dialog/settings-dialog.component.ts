@@ -36,6 +36,14 @@ export class SettingsDialogComponent implements OnInit {
   public readonly settings = signal<AppSettings>({
     tmdbApiKey: "",
     theme: "auto",
+    videoConfig: {
+      format: "mkv",
+      quality: "1080p",
+      codec: "h265",
+      audio: "aac",
+      crf: 20,
+      group: "VideoOptimizer",
+    },
   });
 
   ngOnInit(): void {
@@ -55,6 +63,14 @@ export class SettingsDialogComponent implements OnInit {
     this.settings.set({
       tmdbApiKey: "",
       theme: "auto",
+      videoConfig: {
+        format: "mkv",
+        quality: "1080p",
+        codec: "h265",
+        audio: "aac",
+        crf: 20,
+        group: "VideoOptimizer",
+      },
     });
     await this.settingsService.updateSettings(this.settings());
   }

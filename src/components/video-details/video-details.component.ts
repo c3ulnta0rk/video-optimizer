@@ -5,6 +5,7 @@ import {
   inject,
   signal,
   effect,
+  input,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
@@ -19,6 +20,7 @@ import { VideoFile } from "../../services/files-manager.service";
 import { MovieInfoComponent } from "../movie-info/movie-info.component";
 import { MovieAlternativesDialogComponent } from "../movie-alternatives-dialog/movie-alternatives-dialog.component";
 import { FilesManagerService } from "../../services/files-manager.service";
+import { SettingsService } from "../../services/settings.service";
 import {
   FilenameGeneratorService,
   OutputFileConfig,
@@ -44,50 +46,91 @@ import {
   styleUrls: ["./video-details.component.scss"],
 })
 export class VideoDetailsComponent {
-  @Input() selectedVideo: VideoFile | null = null;
+  selectedVideo = input.required<VideoFile>();
 
   public readonly closeDetails = output<void>();
 
   private readonly dialog = inject(MatDialog);
   private readonly filesManager = inject(FilesManagerService);
   private readonly filenameGenerator = inject(FilenameGeneratorService);
+  private readonly settingsService = inject(SettingsService);
 
   public readonly outputConfig = signal<OutputFileConfig>({
-    format: "mp4",
+    format: "mkv",
     quality: "1080p",
-    codec: "h264",
+    codec: "h265",
     audio: "aac",
+    crf: 20,
     group: "VideoOptimizer",
   });
 
   public readonly generatedFilename = signal<GeneratedFilename | null>(null);
 
   constructor() {
+    // Charger la configuration depuis le store
+    this.loadConfigFromStore();
+
     effect(() => {
       // Régénérer le nom de fichier quand la vidéo sélectionnée ou la config change
-      const video = this.selectedVideo;
+      const video = this.selectedVideo();
       const config = this.outputConfig();
 
-      if (video?.movieInfo) {
-        const defaultConfig = this.filenameGenerator.generateDefaultConfig(
-          video.resolution,
-          video.codec
-        );
+      if (video) {
+        // Générer le nom de fichier même sans movieInfo
+        let filename: GeneratedFilename;
 
-        // Mettre à jour la config par défaut si nécessaire
-        if (!this.generatedFilename()) {
-          this.outputConfig.set(defaultConfig);
+        if (video.movieInfo) {
+          // Utiliser les informations du film si disponibles
+          filename = this.filenameGenerator.generateOutputFilename(
+            video.movieInfo,
+            video.path,
+            config
+          );
+        } else {
+          // Fallback: utiliser le nom du fichier original
+          const baseName = video.name.replace(/\.[^/.]+$/, ""); // Supprimer l'extension
+          const extension = config.format;
+          const fallbackFilename = `${baseName}.${extension}`;
+          const originalDir = this.getDirectoryFromPath(video.path);
+          const suggestedPath = `${originalDir}/${fallbackFilename}`;
+
+          filename = {
+            filename: fallbackFilename,
+            fullPath: suggestedPath,
+            suggestedPath,
+          };
         }
 
-        const filename = this.filenameGenerator.generateOutputFilename(
-          video.movieInfo,
-          video.path,
-          config
-        );
-
         this.generatedFilename.set(filename);
+      } else {
+        // Aucune vidéo sélectionnée, réinitialiser
+        this.generatedFilename.set(null);
       }
     });
+  }
+
+  /**
+   * Charge la configuration depuis le store
+   */
+  private async loadConfigFromStore(): Promise<void> {
+    try {
+      const storedConfig = this.settingsService.getVideoConfig();
+      this.outputConfig.set(storedConfig);
+    } catch (error) {
+      console.error("Erreur lors du chargement de la configuration:", error);
+      // Garder la configuration par défaut en cas d'erreur
+    }
+  }
+
+  /**
+   * Extrait le répertoire depuis un chemin de fichier
+   */
+  private getDirectoryFromPath(filePath: string): string {
+    const lastSlashIndex = Math.max(
+      filePath.lastIndexOf("/"),
+      filePath.lastIndexOf("\\")
+    );
+    return lastSlashIndex > 0 ? filePath.substring(0, lastSlashIndex) : ".";
   }
 
   onCloseDetails(): void {
@@ -98,7 +141,7 @@ export class VideoDetailsComponent {
     if (!this.selectedVideo) return;
 
     const alternatives = this.filesManager.openMovieAlternativesDialog(
-      this.selectedVideo.path
+      this.selectedVideo().path
     );
     if (alternatives) {
       const dialogRef = this.dialog.open(MovieAlternativesDialogComponent, {
@@ -113,7 +156,7 @@ export class VideoDetailsComponent {
       dialogRef.afterClosed().subscribe((selectedMovie) => {
         if (selectedMovie) {
           this.filesManager.updateMovieInfo(
-            this.selectedVideo!.path,
+            this.selectedVideo().path,
             selectedMovie
           );
         }
@@ -136,7 +179,21 @@ export class VideoDetailsComponent {
   }
 
   onConfigChange(newConfig: Partial<OutputFileConfig>): void {
-    this.outputConfig.set({ ...this.outputConfig(), ...newConfig });
+    const updatedConfig = { ...this.outputConfig(), ...newConfig };
+    this.outputConfig.set(updatedConfig);
+
+    // Sauvegarder dans le store
+    this.settingsService.updateVideoConfig(newConfig).catch((error) => {
+      console.error("Erreur lors de la sauvegarde de la configuration:", error);
+    });
+  }
+
+  onCrfChange(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    const crfValue = parseInt(target.value);
+    if (!isNaN(crfValue) && crfValue >= 0 && crfValue <= 51) {
+      this.onConfigChange({ crf: crfValue });
+    }
   }
 
   onFilenameChange(event: Event): void {

@@ -1,4 +1,4 @@
-@if (selectedVideo) {
+@if (selectedVideo()) {
 <div class="video-details-container">
   <div class="details-header">
     <h4>Détails d'optimisation</h4>
@@ -8,13 +8,13 @@
   </div>
 
   <!-- Informations du film -->
-  @if (selectedVideo.movieInfo) {
+  @if (selectedVideo().movieInfo) {
   <app-movie-info
-    [movieInfo]="selectedVideo.movieInfo"
+    [movieInfo]="selectedVideo().movieInfo"
     [showAlternativesButton]="
       !!(
-        selectedVideo.movieAlternatives &&
-        (selectedVideo.movieAlternatives.alternatives.length || 0) > 1
+        selectedVideo().movieAlternatives &&
+        (selectedVideo().movieAlternatives!.alternatives.length || 0) > 1
       )
     "
     (openAlternatives)="onOpenMovieAlternatives()"
@@ -29,40 +29,40 @@
     <div class="details-grid">
       <div class="detail-item">
         <strong>Fichier:</strong>
-        <span>{{ selectedVideo.name }}</span>
+        <span>{{ selectedVideo().name }}</span>
       </div>
 
       <div class="detail-item">
         <strong>Chemin:</strong>
-        <span class="file-path">{{ selectedVideo.path }}</span>
+        <span class="file-path">{{ selectedVideo().path }}</span>
       </div>
 
       <div class="detail-item">
         <strong>Taille actuelle:</strong>
-        <span>{{ formatFileSize(selectedVideo.size || 0) }}</span>
+        <span>{{ formatFileSize(selectedVideo().size || 0) }}</span>
       </div>
 
       <div class="detail-item">
         <strong>Durée:</strong>
-        <span>{{ formatDuration(selectedVideo.duration || 0) }}</span>
+        <span>{{ formatDuration(selectedVideo().duration || 0) }}</span>
       </div>
 
       <div class="detail-item">
         <strong>Résolution:</strong>
-        <span>{{ selectedVideo.resolution || "Non détectée" }}</span>
+        <span>{{ selectedVideo().resolution || "Non détectée" }}</span>
       </div>
 
       <div class="detail-item">
         <strong>Codec:</strong>
-        <span>{{ selectedVideo.codec || "Non détecté" }}</span>
+        <span>{{ selectedVideo().codec || "Non détecté" }}</span>
       </div>
 
       <div class="detail-item">
         <strong>Bitrate:</strong>
         <span>
           {{
-            selectedVideo.bitrate
-              ? ((selectedVideo.bitrate || 0) / 1000).toFixed(0) + " kbps"
+            selectedVideo().bitrate
+              ? ((selectedVideo().bitrate || 0) / 1000).toFixed(0) + " kbps"
               : "Non détecté"
           }}
         </span>
@@ -72,17 +72,17 @@
         <strong>FPS:</strong>
         <span>
           {{
-            selectedVideo.fps
-              ? (selectedVideo.fps || 0).toFixed(2) + " fps"
+            selectedVideo().fps
+              ? (selectedVideo().fps || 0).toFixed(2) + " fps"
               : "Non détecté"
           }}
         </span>
       </div>
 
-      @if (selectedVideo.error) {
+      @if (selectedVideo().error) {
       <div class="detail-item error">
         <strong>Erreur:</strong>
-        <span class="error-text">{{ selectedVideo.error }}</span>
+        <span class="error-text">{{ selectedVideo().error }}</span>
       </div>
       }
     </div>
@@ -148,6 +148,24 @@
           <mat-option value="opus">Opus</mat-option>
         </mat-select>
       </mat-form-field>
+
+      <!-- Taux de compression -->
+      <mat-form-field appearance="outline">
+        <mat-label>Taux de compression (CRF)</mat-label>
+        <input
+          matInput
+          type="number"
+          min="0"
+          max="51"
+          [(ngModel)]="outputConfig().crf"
+          (input)="onCrfChange($event)"
+          placeholder="20"
+        />
+        <mat-hint
+          >0 = sans perte, 51 = compression maximale (20 = qualité
+          excellente)</mat-hint
+        >
+      </mat-form-field>
     </div>
 
     <!-- Nom de fichier généré -->
@@ -175,32 +193,6 @@
     </div>
   </div>
   }
-
-  <!-- Options d'optimisation -->
-  <div class="optimization-section">
-    <h5>Options d'optimisation</h5>
-
-    <div class="optimization-options">
-      <mat-chip-set>
-        <mat-chip color="primary" selected>
-          <mat-icon>video_file</mat-icon>
-          Compression H.264
-        </mat-chip>
-        <mat-chip color="primary" selected>
-          <mat-icon>aspect_ratio</mat-icon>
-          Résolution adaptative
-        </mat-chip>
-        <mat-chip color="primary" selected>
-          <mat-icon>audiotrack</mat-icon>
-          Optimisation audio
-        </mat-chip>
-        <mat-chip color="accent">
-          <mat-icon>speed</mat-icon>
-          Optimisation vitesse
-        </mat-chip>
-      </mat-chip-set>
-    </div>
-  </div>
 </div>
 } @else {
 <div class="no-selection">
