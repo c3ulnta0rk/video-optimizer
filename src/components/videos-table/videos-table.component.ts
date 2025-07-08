@@ -20,7 +20,6 @@ import {
   VideoFile,
 } from "../../services/files-manager.service";
 import { MovieAlternativesDialogComponent } from "../movie-alternatives-dialog/movie-alternatives-dialog.component";
-import { MovieInfoComponent } from "../movie-info/movie-info.component";
 import { VideoDetailsComponent } from "../video-details/video-details.component";
 
 @Component({
@@ -35,7 +34,6 @@ import { VideoDetailsComponent } from "../video-details/video-details.component"
     MatTooltipModule,
     MatProgressSpinnerModule,
     MatDialogModule,
-    MovieInfoComponent,
     VideoDetailsComponent,
   ],
   templateUrl: "./videos-table.component.html",

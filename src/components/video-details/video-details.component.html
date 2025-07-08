@@ -14,7 +14,7 @@
     [showAlternativesButton]="
       !!(
         selectedVideo.movieAlternatives &&
-        (selectedVideo.movieAlternatives?.alternatives?.length || 0) > 1
+        (selectedVideo.movieAlternatives.alternatives.length || 0) > 1
       )
     "
     (openAlternatives)="onOpenMovieAlternatives()"

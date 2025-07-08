@@ -6,9 +6,9 @@ import { MatIconModule } from "@angular/material/icon";
 import { MatButtonModule } from "@angular/material/button";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
-import { FilesSelectorComponent } from "../components/files-selector/files-selector.component";
 import { VideosTableComponent } from "../components/videos-table/videos-table.component";
 import { SettingsDialogComponent } from "../components/settings-dialog/settings-dialog.component";
+import { CustomAppbarComponent } from "../components/custom-appbar/custom-appbar.component";
 import {
   FilesManagerService,
   VideoFile,
@@ -23,8 +23,8 @@ import { SettingsService } from "../services/settings.service";
     MatButtonModule,
     MatTooltipModule,
     MatDialogModule,
-    FilesSelectorComponent,
     VideosTableComponent,
+    CustomAppbarComponent,
   ],
   templateUrl: "./app.component.html",
   styleUrl: "./app.component.scss",

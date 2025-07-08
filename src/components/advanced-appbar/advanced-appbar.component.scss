@@ -1,0 +1,323 @@
+.advanced-appbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  background: linear-gradient(
+    135deg,
+    var(--app-surface) 0%,
+    var(--app-surface-variant) 100%
+  );
+  border-bottom: 1px solid var(--app-border);
+  padding: 0 16px;
+  user-select: none;
+  -webkit-app-region: drag;
+  position: relative;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  .appbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    -webkit-app-region: no-drag;
+
+    .app-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: linear-gradient(
+        135deg,
+        var(--app-primary) 0%,
+        var(--app-primary-variant) 100%
+      );
+      color: white;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+      img {
+        filter: brightness(0) invert(1);
+      }
+    }
+
+    .app-title {
+      font-weight: 700;
+      font-size: 1.2rem;
+      color: var(--app-text-primary);
+      letter-spacing: 0.5px;
+    }
+
+    .main-menu {
+      position: relative;
+
+      .menu-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        color: var(--app-text-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: var(--app-hover);
+          color: var(--app-text-primary);
+        }
+
+        &.active {
+          background: var(--app-primary);
+          color: white;
+        }
+      }
+
+      .menu-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border);
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        min-width: 200px;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-8px);
+        transition: all 0.2s ease;
+        z-index: 1001;
+
+        &.open {
+          opacity: 1;
+          visibility: visible;
+          transform: translateY(0);
+        }
+
+        .menu-item {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 100%;
+          padding: 12px 16px;
+          border: none;
+          background: transparent;
+          color: var(--app-text-primary);
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+
+          &:hover {
+            background: var(--app-hover);
+          }
+
+          &:first-child {
+            border-radius: 8px 8px 0 0;
+          }
+
+          &:last-child {
+            border-radius: 0 0 8px 8px;
+          }
+
+          svg {
+            flex-shrink: 0;
+          }
+        }
+      }
+    }
+  }
+
+  .appbar-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    max-width: 400px;
+    margin: 0 24px;
+    -webkit-app-region: no-drag;
+
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      max-width: 300px;
+      background: var(--app-surface-variant);
+      border: 1px solid var(--app-border);
+      border-radius: 20px;
+      padding: 8px 16px;
+      transition: all 0.2s ease;
+
+      &:focus-within {
+        border-color: var(--app-primary);
+        box-shadow: 0 0 0 2px rgba(var(--app-primary-rgb), 0.2);
+      }
+
+      svg {
+        color: var(--app-text-secondary);
+        flex-shrink: 0;
+      }
+
+      .search-input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        color: var(--app-text-primary);
+        font-size: 0.9rem;
+        outline: none;
+
+        &::placeholder {
+          color: var(--app-text-secondary);
+        }
+      }
+    }
+  }
+
+  .appbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    -webkit-app-region: no-drag;
+
+    .quick-actions {
+      display: flex;
+      gap: 8px;
+
+      .action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: transparent;
+        border-radius: 8px;
+        color: var(--app-text-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: var(--app-hover);
+          color: var(--app-text-primary);
+          transform: translateY(-1px);
+        }
+
+        &:active {
+          transform: translateY(0);
+        }
+      }
+    }
+
+    .window-controls {
+      display: flex;
+      gap: 4px;
+
+      .control-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        color: var(--app-text-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover {
+          background: var(--app-hover);
+          color: var(--app-text-primary);
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+
+        &.minimize:hover {
+          background: #ffa726;
+          color: white;
+        }
+
+        &.maximize:hover {
+          background: #66bb6a;
+          color: white;
+        }
+
+        &.close:hover {
+          background: #ef5350;
+          color: white;
+        }
+
+        svg {
+          pointer-events: none;
+        }
+      }
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .advanced-appbar {
+    height: 48px;
+    padding: 0 12px;
+
+    .appbar-left {
+      gap: 12px;
+
+      .app-icon {
+        width: 32px;
+        height: 32px;
+      }
+
+      .app-title {
+        font-size: 1.1rem;
+      }
+
+      .main-menu .menu-dropdown {
+        min-width: 180px;
+      }
+    }
+
+    .appbar-center {
+      margin: 0 12px;
+
+      .search-bar {
+        max-width: 200px;
+        padding: 6px 12px;
+      }
+    }
+
+    .appbar-right {
+      gap: 12px;
+
+      .quick-actions .action-btn {
+        width: 32px;
+        height: 32px;
+      }
+
+      .window-controls .control-btn {
+        width: 28px;
+        height: 28px;
+      }
+    }
+  }
+}
+
+// Animation d'entrée
+.advanced-appbar {
+  animation: slideDownAdvanced 0.4s ease-out;
+}
+
+@keyframes slideDownAdvanced {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

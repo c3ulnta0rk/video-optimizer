@@ -7,6 +7,9 @@
   ],
   "permissions": [
     "core:default",
+    "core:window:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-decorations",
     "opener:default",
     "shell:default",
     "dialog:default",

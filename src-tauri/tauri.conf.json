@@ -12,7 +12,9 @@
   "app": {
     "windows": [
       {
-        "title": "Video Optimizer"
+        "title": "Video Optimizer",
+        "decorations": false,
+        "transparent": true
       }
     ],
     "security": {

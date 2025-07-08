@@ -1,0 +1,149 @@
+.custom-appbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  background: linear-gradient(
+    135deg,
+    var(--app-surface) 0%,
+    var(--app-surface-variant) 100%
+  );
+  border-bottom: 1px solid var(--app-border);
+  padding: 0 16px;
+  user-select: none;
+  -webkit-app-region: drag; // Pour macOS
+  position: relative;
+  z-index: 1000;
+
+  .appbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    -webkit-app-region: no-drag; // Permet les interactions dans cette zone
+
+    .app-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--app-primary);
+      color: white;
+
+      img {
+        filter: brightness(0) invert(1);
+      }
+    }
+
+    .app-title {
+      font-weight: 600;
+      font-size: 1.1rem;
+      color: var(--app-text-primary);
+      letter-spacing: 0.5px;
+    }
+  }
+
+  .appbar-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    -webkit-app-region: no-drag;
+  }
+
+  .appbar-right {
+    display: flex;
+    align-items: center;
+    -webkit-app-region: no-drag;
+
+    .window-controls {
+      display: flex;
+      gap: 4px;
+
+      .control-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        color: var(--app-text-secondary);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        position: relative;
+
+        &:hover {
+          background: var(--app-hover);
+          color: var(--app-text-primary);
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+
+        &.minimize:hover {
+          background: #ffa726;
+          color: white;
+        }
+
+        &.maximize:hover {
+          background: #66bb6a;
+          color: white;
+        }
+
+        &.close:hover {
+          background: #ef5350;
+          color: white;
+        }
+
+        svg {
+          pointer-events: none;
+        }
+      }
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .custom-appbar {
+    height: 44px;
+    padding: 0 12px;
+
+    .appbar-left {
+      gap: 8px;
+
+      .app-icon {
+        width: 28px;
+        height: 28px;
+      }
+
+      .app-title {
+        font-size: 1rem;
+      }
+    }
+
+    .window-controls .control-btn {
+      width: 28px;
+      height: 28px;
+    }
+  }
+}
+
+// Animation d'entrée
+.custom-appbar {
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

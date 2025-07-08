@@ -1,13 +1,10 @@
-<mat-toolbar class="justify-between">
-  <span>Video Optimizer</span>
-  <div class="toolbar-actions">
-    <app-files-selector />
-    <button mat-icon-button (click)="openSettings()" matTooltip="Paramètres">
-      <mat-icon>settings</mat-icon>
-    </button>
-  </div>
-</mat-toolbar>
+<!-- Appbar personnalisée -->
+<app-custom-appbar></app-custom-appbar>
 
-<app-videos-table 
-  (videoSelected)="onVideoSelected($event)"
-  (videoRemoved)="onVideoRemoved($event)" />
+<!-- Contenu principal -->
+<div class="main-content">
+  <app-videos-table
+    (videoSelected)="onVideoSelected($event)"
+    (videoRemoved)="onVideoRemoved($event)"
+  />
+</div>

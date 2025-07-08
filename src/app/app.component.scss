@@ -1,22 +1,8 @@
-// Styles pour la toolbar
-mat-toolbar {
-  background-color: var(--app-surface) !important;
-  color: var(--app-text-primary) !important;
-  border-bottom: 1px solid var(--app-border);
-  box-shadow: 0 2px 4px var(--app-shadow);
-  transition: background-color 0.3s ease, color 0.3s ease,
-    border-color 0.3s ease;
-
-  span {
-    font-weight: 500;
-    font-size: 1.2rem;
-  }
-
-  .toolbar-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+// Styles pour le contenu principal
+.main-content {
+  padding: 16px;
+  height: calc(100vh - 48px); // Hauteur totale moins l'appbar
+  overflow-y: auto;
 }
 
 // Styles pour le contenu principal
@@ -34,11 +20,8 @@ mat-toolbar {
 
 // Responsive design
 @media (max-width: 768px) {
-  mat-toolbar {
-    padding: 0 1rem;
-
-    span {
-      font-size: 1rem;
-    }
+  .main-content {
+    padding: 12px;
+    height: calc(100vh - 44px); // Hauteur ajustée pour mobile
   }
 }

@@ -1,0 +1,55 @@
+<div class="custom-appbar" (mousedown)="onMouseDown($event)">
+  <div class="appbar-left">
+    <div class="app-icon">
+      <img src="assets/angular.svg" alt="App Icon" width="24" height="24" />
+    </div>
+    <span class="app-title">Video Optimizer</span>
+  </div>
+
+  <div class="appbar-center">
+    <!-- Zone pour le contenu central (optionnel) -->
+  </div>
+
+  <div class="appbar-right">
+    <div class="window-controls">
+      <button
+        class="control-btn minimize"
+        (click)="minimizeWindow()"
+        title="Minimiser"
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <rect x="2" y="5" width="8" height="2" fill="currentColor" />
+        </svg>
+      </button>
+
+      <button
+        class="control-btn maximize"
+        (click)="maximizeWindow()"
+        title="Maximiser"
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <rect
+            x="2"
+            y="2"
+            width="8"
+            height="8"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          />
+        </svg>
+      </button>
+
+      <button class="control-btn close" (click)="closeWindow()" title="Fermer">
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <path
+            d="M2 2L10 10M10 2L2 10"
+            stroke="currentColor"
+            stroke-width="1.5"
+            fill="none"
+          />
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
