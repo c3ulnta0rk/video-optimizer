@@ -413,7 +413,8 @@
         Start Conversion
       </button>
     </div>
-    } @if (conversionState.result) {
+    } @if (conversionState.result && conversionState.result.error !==
+    "Conversion arrêtée par l'utilisateur") {
     <div
       class="conversion-result"
       [class.success]="conversionState.result.success"

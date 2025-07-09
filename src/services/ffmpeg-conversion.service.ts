@@ -40,10 +40,30 @@ export interface ConversionState {
   result: ConversionResult | null;
 }
 
+export interface VideoMetadata {
+  path: string;
+  name: string;
+  size: number;
+  duration?: number;
+  resolution?: string;
+  codec?: string;
+  bitrate?: number;
+  fps?: number;
+  audio_tracks: AudioTrack[];
+  subtitle_tracks: SubtitleTrack[];
+  error?: string;
+}
+
+export interface FfmpegFormat {
+  name: string;
+  description: string;
+  extensions: string[];
+}
+
 @Injectable({
   providedIn: "root",
 })
-export class ConversionService {
+export class FfmpegConversionService {
   private readonly _conversionState = signal<ConversionState>({
     isConverting: false,
     progress: null,
@@ -67,7 +87,43 @@ export class ConversionService {
   }
 
   /**
-   * Démarre la conversion d'une vidéo
+   * Vérifie si ffmpeg-next est disponible
+   */
+  async checkFfmpegAvailable(): Promise<boolean> {
+    try {
+      return await invoke<boolean>("check_ffmpeg_available_ffmpeg");
+    } catch (error) {
+      console.error("Erreur lors de la vérification de ffmpeg:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Récupère les métadonnées d'une vidéo avec ffmpeg-next
+   */
+  async getVideoMetadata(path: string): Promise<VideoMetadata> {
+    try {
+      return await invoke<VideoMetadata>("get_video_metadata_ffmpeg", { path });
+    } catch (error) {
+      console.error("Erreur lors de la récupération des métadonnées:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les formats de sortie supportés
+   */
+  async getOutputFormats(): Promise<FfmpegFormat[]> {
+    try {
+      return await invoke<FfmpegFormat[]>("get_ffmpeg_output_formats_ffmpeg");
+    } catch (error) {
+      console.error("Erreur lors de la récupération des formats:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Démarre la conversion d'une vidéo avec ffmpeg-next
    */
   async startConversion(
     video: VideoFile,
@@ -120,12 +176,12 @@ export class ConversionService {
       }));
 
       if (result.success) {
-        console.log("Conversion réussie:", result.output_path);
+        console.log("Conversion réussie avec ffmpeg-next:", result.output_path);
       } else {
-        console.error("Échec de la conversion:", result.error);
+        console.error("Échec de la conversion avec ffmpeg-next:", result.error);
       }
     } catch (error) {
-      console.error("Erreur lors de la conversion:", error);
+      console.error("Erreur lors de la conversion avec ffmpeg-next:", error);
       this._conversionState.update((state: ConversionState) => ({
         ...state,
         isConverting: false,
@@ -201,20 +257,28 @@ export class ConversionService {
       }
     }
 
-    // Utiliser le nom de fichier fourni ou générer un nom par défaut
-    if (outputFilename) {
-      return `${outputDirectory}/${outputFilename}`;
-    } else {
-      const lastDotIndex = inputPath.lastIndexOf(".");
+    // Générer le nom de fichier de sortie
+    let outputFilename_final = outputFilename;
+    if (!outputFilename_final) {
+      const inputFilename = video.name;
+      const lastDotIndex = inputFilename.lastIndexOf(".");
       const baseName =
-        lastDotIndex > 0 ? inputPath.substring(0, lastDotIndex) : inputPath;
-      const fileName = baseName.substring(baseName.lastIndexOf("/") + 1);
-      return `${outputDirectory}/${fileName}_optimized.${config.format}`;
+        lastDotIndex > 0
+          ? inputFilename.substring(0, lastDotIndex)
+          : inputFilename;
+      outputFilename_final = `${baseName}_converted.${config.format}`;
     }
+
+    // Construire le chemin complet
+    const separator =
+      outputDirectory.endsWith("/") || outputDirectory.endsWith("\\")
+        ? ""
+        : "/";
+    return `${outputDirectory}${separator}${outputFilename_final}`;
   }
 
   /**
-   * Formate le temps en format lisible
+   * Formate le temps en secondes en format lisible
    */
   formatTime(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
@@ -222,11 +286,11 @@ export class ConversionService {
     const secs = Math.floor(seconds % 60);
 
     if (hours > 0) {
-      return `${hours}h ${minutes}m ${secs}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+        .toString()
+        .padStart(2, "0")}`;
     } else {
-      return `${secs}s`;
+      return `${minutes}:${secs.toString().padStart(2, "0")}`;
     }
   }
 
@@ -234,6 +298,6 @@ export class ConversionService {
    * Formate la progression en pourcentage
    */
   formatProgress(progress: number): string {
-    return `${(progress * 100).toFixed(1)}%`;
+    return `${Math.round(progress * 100)}%`;
   }
 }

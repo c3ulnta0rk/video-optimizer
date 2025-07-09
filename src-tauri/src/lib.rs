@@ -1,5 +1,6 @@
 mod video_commands;
 mod window_commands;
+mod ffmpeg_converter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -18,7 +19,14 @@ pub fn run() {
             video_commands::check_ffprobe_available,
             video_commands::check_ffmpeg_available,
             video_commands::get_ffmpeg_output_formats,
-            video_commands::start_video_conversion,
+            // ffmpeg_converter uniquement pour la conversion
+            ffmpeg_converter::get_video_metadata_ffmpeg,
+            ffmpeg_converter::start_video_conversion_ffmpeg,
+            ffmpeg_converter::test_conversion_with_file,
+            // ffmpeg_converter::start_video_conversion_native, // Temporairement désactivé
+            ffmpeg_converter::stop_video_conversion_ffmpeg,
+            ffmpeg_converter::check_ffmpeg_available_ffmpeg,
+            ffmpeg_converter::get_ffmpeg_output_formats_ffmpeg,
             window_commands::minimize_window,
             window_commands::maximize_window,
             window_commands::close_window,

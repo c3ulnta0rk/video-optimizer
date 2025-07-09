@@ -1,136 +1,215 @@
-import { Component, inject } from "@angular/core";
-import { CommonModule } from "@angular/common";
-import { MatButtonModule } from "@angular/material/button";
-import { MatCardModule } from "@angular/material/card";
-import { MatIconModule } from "@angular/material/icon";
-import { FfmpegFormatsService } from "../../services/ffmpeg-formats.service";
+import { Component, OnInit } from "@angular/core";
+import { FfmpegConversionService } from "../../services/ffmpeg-conversion.service";
 
 @Component({
   selector: "app-ffmpeg-test",
-  standalone: true,
-  imports: [CommonModule, MatButtonModule, MatCardModule, MatIconModule],
   template: `
-    <mat-card class="test-card">
-      <mat-card-header>
-        <mat-card-title>Test Module FFmpeg</mat-card-title>
-        <mat-card-subtitle
-          >Vérification des formats supportés</mat-card-subtitle
-        >
-      </mat-card-header>
+    <div class="ffmpeg-test">
+      <h3>Test FFmpeg-Next</h3>
 
-      <mat-card-content>
-        <div class="status">
-          <p>
-            <strong>État FFmpeg:</strong>
-            <span
-              [class]="ffmpegInfo().available ? 'available' : 'unavailable'"
-            >
-              {{ ffmpegInfo().available ? "Disponible" : "Non disponible" }}
-            </span>
-          </p>
-
-          <p>
-            <strong>Formats trouvés:</strong> {{ ffmpegInfo().formats.length }}
-          </p>
-
-          <div *ngIf="ffmpegInfo().loading" class="loading">
-            <mat-icon>hourglass_empty</mat-icon>
-            Chargement en cours...
-          </div>
-
-          <div *ngIf="ffmpegInfo().error" class="error">
-            <mat-icon>error</mat-icon>
-            {{ ffmpegInfo().error }}
-          </div>
-        </div>
-
-        <div
-          *ngIf="ffmpegInfo().available && ffmpegInfo().formats.length > 0"
-          class="formats-preview"
-        >
-          <h4>Formats courants:</h4>
-          <div class="formats-list">
-            <span *ngFor="let format of getCommonFormats()" class="format-tag">
-              {{ format.name }}
-            </span>
-          </div>
-        </div>
-      </mat-card-content>
-
-      <mat-card-actions>
-        <button mat-raised-button color="primary" (click)="refreshFormats()">
-          <mat-icon>refresh</mat-icon>
-          Actualiser
+      <div class="status-section">
+        <h4>Statut FFmpeg</h4>
+        <p>FFmpeg disponible: {{ ffmpegAvailable ? "Oui" : "Non" }}</p>
+        <button (click)="checkFfmpeg()" [disabled]="checking">
+          {{ checking ? "Vérification..." : "Vérifier FFmpeg" }}
         </button>
-      </mat-card-actions>
-    </mat-card>
+      </div>
+
+      <div class="formats-section" *ngIf="ffmpegAvailable">
+        <h4>Formats supportés</h4>
+        <div class="formats-list">
+          <div *ngFor="let format of formats" class="format-item">
+            <strong>{{ format.name }}</strong> - {{ format.description }}
+            <br />
+            <small>Extensions: {{ format.extensions.join(", ") }}</small>
+          </div>
+        </div>
+        <button (click)="loadFormats()" [disabled]="loadingFormats">
+          {{ loadingFormats ? "Chargement..." : "Charger les formats" }}
+        </button>
+      </div>
+
+      <div class="conversion-section" *ngIf="ffmpegAvailable">
+        <h4>Test de conversion</h4>
+        <div class="conversion-status">
+          <p>
+            État:
+            {{
+              conversionState.isConverting
+                ? "Conversion en cours"
+                : "En attente"
+            }}
+          </p>
+          <div *ngIf="conversionState.progress" class="progress">
+            <p>
+              Progression:
+              {{ formatProgress(conversionState.progress.progress) }}
+            </p>
+            <p>
+              Temps actuel:
+              {{ formatTime(conversionState.progress.current_time) }}
+            </p>
+            <p>
+              Temps total: {{ formatTime(conversionState.progress.total_time) }}
+            </p>
+            <p>ETA: {{ formatTime(conversionState.progress.eta) }}</p>
+            <p>Statut: {{ conversionState.progress.status }}</p>
+          </div>
+          <div *ngIf="conversionState.result" class="result">
+            <p [class]="conversionState.result.success ? 'success' : 'error'">
+              {{
+                conversionState.result.success
+                  ? "Conversion réussie"
+                  : "Échec de la conversion"
+              }}
+            </p>
+            <p *ngIf="conversionState.result.output_path">
+              Fichier: {{ conversionState.result.output_path }}
+            </p>
+            <p *ngIf="conversionState.result.error">
+              Erreur: {{ conversionState.result.error }}
+            </p>
+            <p>Durée: {{ formatTime(conversionState.result.duration) }}</p>
+          </div>
+        </div>
+        <button
+          (click)="stopConversion()"
+          [disabled]="!conversionState.isConverting"
+        >
+          Arrêter la conversion
+        </button>
+      </div>
+    </div>
   `,
   styles: [
     `
-      .test-card {
-        margin: 16px;
-        max-width: 500px;
+      .ffmpeg-test {
+        padding: 20px;
+        max-width: 600px;
       }
 
-      .status {
-        margin-bottom: 16px;
-      }
-
-      .available {
-        color: #4caf50;
-        font-weight: bold;
-      }
-
-      .unavailable {
-        color: #f44336;
-        font-weight: bold;
-      }
-
-      .loading {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: #2196f3;
-      }
-
-      .error {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: #f44336;
-      }
-
-      .formats-preview {
-        margin-top: 16px;
+      .status-section,
+      .formats-section,
+      .conversion-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
       }
 
       .formats-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 8px;
+        margin: 10px 0;
       }
 
-      .format-tag {
-        background: #e3f2fd;
-        color: #1976d2;
-        padding: 4px 8px;
+      .format-item {
+        margin: 5px 0;
+        padding: 5px;
+        background: #f5f5f5;
+        border-radius: 3px;
+      }
+
+      .progress {
+        margin: 10px 0;
+        padding: 10px;
+        background: #e8f4fd;
+        border-radius: 3px;
+      }
+
+      .result {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 3px;
+      }
+
+      .result .success {
+        color: green;
+        font-weight: bold;
+      }
+
+      .result .error {
+        color: red;
+        font-weight: bold;
+      }
+
+      button {
+        margin: 5px;
+        padding: 8px 16px;
+        background: #007bff;
+        color: white;
+        border: none;
         border-radius: 4px;
-        font-size: 0.9rem;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      button:hover:not(:disabled) {
+        background: #0056b3;
       }
     `,
   ],
 })
-export class FfmpegTestComponent {
-  private readonly ffmpegService = inject(FfmpegFormatsService);
+export class FfmpegTestComponent implements OnInit {
+  ffmpegAvailable = false;
+  checking = false;
+  loadingFormats = false;
+  formats: any[] = [];
+  conversionState: any = {
+    isConverting: false,
+    progress: null,
+    result: null,
+  };
 
-  public readonly ffmpegInfo = this.ffmpegService.ffmpegInfo;
+  constructor(private ffmpegService: FfmpegConversionService) {}
 
-  public getCommonFormats() {
-    return this.ffmpegService.getCommonVideoFormats();
+  ngOnInit() {
+    this.checkFfmpeg();
+    this.loadFormats();
+
+    // Utiliser le signal directement
+    this.conversionState = this.ffmpegService.conversionState();
   }
 
-  public async refreshFormats() {
-    await this.ffmpegService.refreshFormats();
+  async checkFfmpeg() {
+    this.checking = true;
+    try {
+      this.ffmpegAvailable = await this.ffmpegService.checkFfmpegAvailable();
+    } catch (error) {
+      console.error("Erreur lors de la vérification de FFmpeg:", error);
+      this.ffmpegAvailable = false;
+    } finally {
+      this.checking = false;
+    }
+  }
+
+  async loadFormats() {
+    this.loadingFormats = true;
+    try {
+      this.formats = await this.ffmpegService.getOutputFormats();
+    } catch (error) {
+      console.error("Erreur lors du chargement des formats:", error);
+      this.formats = [];
+    } finally {
+      this.loadingFormats = false;
+    }
+  }
+
+  async stopConversion() {
+    try {
+      await this.ffmpegService.stopConversion();
+    } catch (error) {
+      console.error("Erreur lors de l'arrêt de la conversion:", error);
+    }
+  }
+
+  formatTime(seconds: number): string {
+    return this.ffmpegService.formatTime(seconds);
+  }
+
+  formatProgress(progress: number): string {
+    return this.ffmpegService.formatProgress(progress);
   }
 }
