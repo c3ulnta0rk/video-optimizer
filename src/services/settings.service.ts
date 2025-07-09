@@ -7,6 +7,7 @@ export interface AppSettings {
   tmdbApiKey: string;
   theme: "light" | "dark" | "auto";
   videoConfig: OutputFileConfig;
+  defaultOutputPath: string | null; // Chemin de sortie par défaut (null = même dossier que source)
 }
 
 @Injectable({
@@ -47,6 +48,7 @@ export class SettingsService {
         crf: 20,
         group: "VideoOptimizer",
       },
+      defaultOutputPath: null, // Par défaut, utiliser le même dossier que la source
     };
   }
 
@@ -124,6 +126,14 @@ export class SettingsService {
     const currentConfig = this.getVideoConfig();
     const newConfig = { ...currentConfig, ...updates };
     await this.setVideoConfig(newConfig);
+  }
+
+  getDefaultOutputPath(): string | null {
+    return this.getSettings().defaultOutputPath;
+  }
+
+  async setDefaultOutputPath(path: string | null): Promise<void> {
+    await this.updateSettings({ defaultOutputPath: path });
   }
 
   toggleTheme() {

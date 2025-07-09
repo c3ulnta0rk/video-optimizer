@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { VideoFile, AudioTrack, SubtitleTrack } from "./files-manager.service";
 import { OutputFileConfig } from "./filename-generator.service";
+import { SettingsService } from "./settings.service";
 
 export interface ConversionConfig {
   input_path: string;
@@ -52,7 +53,7 @@ export class ConversionService {
 
   public readonly conversionState = this._conversionState.asReadonly();
 
-  constructor() {
+  constructor(private settingsService: SettingsService) {
     this.setupEventListeners();
   }
 
@@ -73,7 +74,8 @@ export class ConversionService {
     config: OutputFileConfig,
     selectedAudioTracks: number[],
     selectedSubtitleTracks: number[],
-    outputFilename?: string
+    outputFilename?: string,
+    customOutputPath?: string | null
   ): Promise<void> {
     try {
       // Mettre à jour l'état
@@ -87,7 +89,12 @@ export class ConversionService {
       // Préparer la configuration de conversion
       const conversionConfig: ConversionConfig = {
         input_path: video.path,
-        output_path: this.generateOutputPath(video, config, outputFilename),
+        output_path: this.generateOutputPath(
+          video,
+          config,
+          outputFilename,
+          customOutputPath
+        ),
         format: config.format,
         quality: config.quality,
         codec: config.codec,
@@ -145,24 +152,40 @@ export class ConversionService {
   private generateOutputPath(
     video: VideoFile,
     config: OutputFileConfig,
-    outputFilename?: string
+    outputFilename?: string,
+    customOutputPath?: string | null
   ): string {
     const inputPath = video.path;
     const lastSlashIndex = Math.max(
       inputPath.lastIndexOf("/"),
       inputPath.lastIndexOf("\\")
     );
-    const directory =
+    const sourceDirectory =
       lastSlashIndex > 0 ? inputPath.substring(0, lastSlashIndex) : ".";
+
+    // Déterminer le répertoire de sortie
+    let outputDirectory = sourceDirectory; // Par défaut, même dossier que la source
+
+    // Utiliser le chemin personnalisé si fourni
+    if (customOutputPath) {
+      outputDirectory = customOutputPath;
+    } else {
+      // Sinon, utiliser le chemin par défaut des paramètres
+      const defaultPath = this.settingsService.getDefaultOutputPath();
+      if (defaultPath) {
+        outputDirectory = defaultPath;
+      }
+    }
 
     // Utiliser le nom de fichier fourni ou générer un nom par défaut
     if (outputFilename) {
-      return `${directory}/${outputFilename}`;
+      return `${outputDirectory}/${outputFilename}`;
     } else {
       const lastDotIndex = inputPath.lastIndexOf(".");
       const baseName =
         lastDotIndex > 0 ? inputPath.substring(0, lastDotIndex) : inputPath;
-      return `${baseName}_optimized.${config.format}`;
+      const fileName = baseName.substring(baseName.lastIndexOf("/") + 1);
+      return `${outputDirectory}/${fileName}_optimized.${config.format}`;
     }
   }
 

@@ -12,6 +12,7 @@ import { MatSelectModule } from "@angular/material/select";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { SettingsService, AppSettings } from "../../services/settings.service";
+import { DirectorySelectorService } from "../../services/directory-selector.service";
 
 @Component({
   selector: "app-settings-dialog",
@@ -32,6 +33,7 @@ import { SettingsService, AppSettings } from "../../services/settings.service";
 export class SettingsDialogComponent implements OnInit {
   private dialogRef = inject(MatDialogRef<SettingsDialogComponent>);
   private settingsService = inject(SettingsService);
+  private directorySelector = inject(DirectorySelectorService);
 
   public readonly settings = signal<AppSettings>({
     tmdbApiKey: "",
@@ -44,6 +46,7 @@ export class SettingsDialogComponent implements OnInit {
       crf: 20,
       group: "VideoOptimizer",
     },
+    defaultOutputPath: null,
   });
 
   ngOnInit(): void {
@@ -71,7 +74,18 @@ export class SettingsDialogComponent implements OnInit {
         crf: 20,
         group: "VideoOptimizer",
       },
+      defaultOutputPath: null,
     });
     await this.settingsService.updateSettings(this.settings());
+  }
+
+  async selectDefaultOutputPath(): Promise<void> {
+    const selectedPath = await this.directorySelector.selectDirectory();
+    if (selectedPath !== null) {
+      this.settings.update((settings) => ({
+        ...settings,
+        defaultOutputPath: selectedPath,
+      }));
+    }
   }
 }

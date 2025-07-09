@@ -29,6 +29,7 @@ import {
   GeneratedFilename,
 } from "../../services/filename-generator.service";
 import { ConversionService } from "../../services/conversion.service";
+import { DirectorySelectorService } from "../../services/directory-selector.service";
 
 @Component({
   selector: "app-video-details",
@@ -60,6 +61,7 @@ export class VideoDetailsComponent {
   private readonly filenameGenerator = inject(FilenameGeneratorService);
   private readonly settingsService = inject(SettingsService);
   private readonly conversionService = inject(ConversionService);
+  private readonly directorySelector = inject(DirectorySelectorService);
 
   public readonly outputConfig = signal<OutputFileConfig>({
     format: "mkv",
@@ -75,6 +77,9 @@ export class VideoDetailsComponent {
   // États des sections expansibles
   public audioSectionExpanded = signal(false);
   public subtitleSectionExpanded = signal(false);
+
+  // Chemin de sortie personnalisé
+  public readonly customOutputPath = signal<string | null>(null);
 
   // Sélections des pistes
   private selectedAudioTracks = new Set<number>();
@@ -248,6 +253,36 @@ export class VideoDetailsComponent {
     }
   }
 
+  async selectCustomOutputPath(): Promise<void> {
+    const selectedPath = await this.directorySelector.selectDirectory();
+    if (selectedPath !== null) {
+      this.customOutputPath.set(selectedPath);
+    }
+  }
+
+  getCurrentOutputPath(): string {
+    const video = this.selectedVideo();
+    if (!video) return "";
+
+    const customPath = this.customOutputPath();
+    if (customPath) {
+      return customPath;
+    }
+
+    const defaultPath = this.settingsService.getDefaultOutputPath();
+    if (defaultPath) {
+      return defaultPath;
+    }
+
+    // Retourner le répertoire du fichier source
+    const inputPath = video.path;
+    const lastSlashIndex = Math.max(
+      inputPath.lastIndexOf("/"),
+      inputPath.lastIndexOf("\\")
+    );
+    return lastSlashIndex > 0 ? inputPath.substring(0, lastSlashIndex) : ".";
+  }
+
   // Méthodes pour les sections expansibles
   toggleAudioSection(): void {
     this.audioSectionExpanded.set(!this.audioSectionExpanded());
@@ -377,13 +412,15 @@ export class VideoDetailsComponent {
     // Récupérer le nom de fichier généré
     const generatedFilename = this.generatedFilename();
     const outputFilename = generatedFilename?.filename;
+    const customPath = this.customOutputPath();
 
     await this.conversionService.startConversion(
       video,
       this.outputConfig(),
       selectedAudioTracks,
       selectedSubtitleTracks,
-      outputFilename
+      outputFilename,
+      customPath
     );
   }
 

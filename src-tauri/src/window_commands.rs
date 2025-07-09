@@ -27,4 +27,6 @@ pub async fn start_dragging(window: Window) -> Result<(), ()> {
 #[tauri::command]
 pub async fn is_maximized(window: Window) -> Result<bool, ()> {
     window.is_maximized().map_err(|_| ())
-} 
+}
+
+

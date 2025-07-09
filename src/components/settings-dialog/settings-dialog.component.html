@@ -9,15 +9,19 @@
       <!-- Clé API TMDB -->
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Clé API The Movie Database</mat-label>
-        <input 
-          matInput 
-          [(ngModel)]="settings().tmdbApiKey" 
+        <input
+          matInput
+          [(ngModel)]="settings().tmdbApiKey"
           placeholder="Entrez votre clé API TMDB"
           type="password"
         />
         <mat-hint>
-          Obtenez votre clé API gratuite sur 
-          <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">
+          Obtenez votre clé API gratuite sur
+          <a
+            href="https://www.themoviedb.org/settings/api"
+            target="_blank"
+            rel="noopener"
+          >
             themoviedb.org
           </a>
         </mat-hint>
@@ -33,6 +37,32 @@
         </mat-select>
         <mat-hint>Choisissez votre préférence de thème</mat-hint>
       </mat-form-field>
+
+      <!-- Chemin de sortie par défaut -->
+      <div class="output-path-section">
+        <label class="form-label">Chemin de sortie par défaut</label>
+        <div class="path-selector">
+          <div class="path-display">
+            <mat-icon>folder</mat-icon>
+            <span class="path-text">
+              {{ settings().defaultOutputPath || "Même dossier que la source" }}
+            </span>
+          </div>
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="selectDefaultOutputPath()"
+            class="select-button"
+          >
+            <mat-icon>folder_open</mat-icon>
+            Choisir
+          </button>
+        </div>
+        <div class="path-hint">
+          Chemin par défaut pour sauvegarder les fichiers convertis. Laissez
+          vide pour utiliser le même dossier que le fichier source.
+        </div>
+      </div>
     </div>
   </mat-dialog-content>
 
@@ -41,12 +71,10 @@
       <mat-icon>restore</mat-icon>
       Réinitialiser
     </button>
-    <button mat-button (click)="onCancel()">
-      Annuler
-    </button>
+    <button mat-button (click)="onCancel()">Annuler</button>
     <button mat-raised-button (click)="onSave()" color="primary">
       <mat-icon>save</mat-icon>
       Enregistrer
     </button>
   </mat-dialog-actions>
-</div> 
+</div>

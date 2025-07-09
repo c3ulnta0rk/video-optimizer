@@ -324,9 +324,19 @@
           >
         </mat-form-field>
 
-        <div class="file-path-display">
+        <div class="file-path-display flex items-center gap-2">
           <mat-icon>folder</mat-icon>
-          <span>{{ generatedFilename()?.suggestedPath }}</span>
+          <span class="flex-1 text-ellipsis">{{ getCurrentOutputPath() }}</span>
+
+          <button
+            mat-stroked-button
+            type="button"
+            (click)="selectCustomOutputPath()"
+            class="select-button"
+          >
+            <mat-icon>folder_open</mat-icon>
+            Choisir
+          </button>
         </div>
       </div>
     </div>
