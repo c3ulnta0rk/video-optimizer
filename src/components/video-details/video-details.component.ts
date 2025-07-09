@@ -13,6 +13,7 @@ import { MatIconModule } from "@angular/material/icon";
 import { MatButtonModule } from "@angular/material/button";
 import { MatChipsModule } from "@angular/material/chips";
 import { MatCheckboxModule } from "@angular/material/checkbox";
+import { MatProgressBarModule } from "@angular/material/progress-bar";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
@@ -27,6 +28,7 @@ import {
   OutputFileConfig,
   GeneratedFilename,
 } from "../../services/filename-generator.service";
+import { ConversionService } from "../../services/conversion.service";
 
 @Component({
   selector: "app-video-details",
@@ -38,6 +40,7 @@ import {
     MatButtonModule,
     MatChipsModule,
     MatCheckboxModule,
+    MatProgressBarModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -56,6 +59,7 @@ export class VideoDetailsComponent {
   private readonly filesManager = inject(FilesManagerService);
   private readonly filenameGenerator = inject(FilenameGeneratorService);
   private readonly settingsService = inject(SettingsService);
+  private readonly conversionService = inject(ConversionService);
 
   public readonly outputConfig = signal<OutputFileConfig>({
     format: "mkv",
@@ -83,6 +87,11 @@ export class VideoDetailsComponent {
 
   get subtitleTracks() {
     return this.selectedVideo()?.subtitle_tracks || [];
+  }
+
+  // Getter pour l'état de conversion
+  get conversionState() {
+    return this.conversionService.conversionState();
   }
 
   constructor() {
@@ -355,5 +364,33 @@ export class VideoDetailsComponent {
     } else {
       this.selectedSubtitleTracks.clear();
     }
+  }
+
+  // Méthodes de conversion
+  async startConversion(): Promise<void> {
+    const video = this.selectedVideo();
+    if (!video) return;
+
+    const selectedAudioTracks = Array.from(this.selectedAudioTracks);
+    const selectedSubtitleTracks = Array.from(this.selectedSubtitleTracks);
+
+    await this.conversionService.startConversion(
+      video,
+      this.outputConfig(),
+      selectedAudioTracks,
+      selectedSubtitleTracks
+    );
+  }
+
+  stopConversion(): void {
+    this.conversionService.stopConversion();
+  }
+
+  formatTime(seconds: number): string {
+    return this.conversionService.formatTime(seconds);
+  }
+
+  formatProgress(progress: number): string {
+    return this.conversionService.formatProgress(progress);
   }
 }

@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::path::Path;
+use std::io::{BufRead, BufReader};
 use tauri::command;
+use tauri::Emitter;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AudioTrack {
@@ -224,6 +226,79 @@ fn get_ffprobe_metadata(path: &Path) -> Result<VideoMetadata, String> {
     })
 }
 
+// Fonctions helper pour obtenir les vrais indices des streams
+fn get_audio_stream_indices(input_path: &str) -> Result<Vec<u32>, String> {
+    let output = Command::new("ffprobe")
+        .args(&[
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_streams",
+            "-select_streams", "a",
+            input_path
+        ])
+        .output()
+        .map_err(|e| format!("Failed to execute ffprobe: {}", e))?;
+
+    if !output.status.success() {
+        return Err("ffprobe command failed".to_string());
+    }
+
+    let json_str = String::from_utf8(output.stdout)
+        .map_err(|e| format!("Failed to parse ffprobe output: {}", e))?;
+
+    let json: serde_json::Value = serde_json::from_str(&json_str)
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+    let streams = json.get("streams")
+        .and_then(|s| s.as_array())
+        .ok_or("No streams found")?;
+
+    let mut indices = Vec::new();
+    for stream in streams {
+        if let Some(index) = stream.get("index").and_then(|i| i.as_u64()) {
+            indices.push(index as u32);
+        }
+    }
+
+    Ok(indices)
+}
+
+fn get_subtitle_stream_indices(input_path: &str) -> Result<Vec<u32>, String> {
+    let output = Command::new("ffprobe")
+        .args(&[
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_streams",
+            "-select_streams", "s",
+            input_path
+        ])
+        .output()
+        .map_err(|e| format!("Failed to execute ffprobe: {}", e))?;
+
+    if !output.status.success() {
+        return Err("ffprobe command failed".to_string());
+    }
+
+    let json_str = String::from_utf8(output.stdout)
+        .map_err(|e| format!("Failed to parse ffprobe output: {}", e))?;
+
+    let json: serde_json::Value = serde_json::from_str(&json_str)
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+
+    let streams = json.get("streams")
+        .and_then(|s| s.as_array())
+        .ok_or("No streams found")?;
+
+    let mut indices = Vec::new();
+    for stream in streams {
+        if let Some(index) = stream.get("index").and_then(|i| i.as_u64()) {
+            indices.push(index as u32);
+        }
+    }
+
+    Ok(indices)
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FfmpegFormat {
     pub name: String,
@@ -354,4 +429,201 @@ pub async fn check_ffprobe_available() -> Result<bool, String> {
         Ok(output) => Ok(output.status.success()),
         Err(_) => Ok(false),
     }
+}
+
+#[command]
+pub async fn start_video_conversion(
+    config: ConversionConfig,
+    window: tauri::Window,
+) -> Result<ConversionResult, String> {
+    let start_time = std::time::Instant::now();
+    
+    // Analyser d'abord le fichier pour obtenir les vrais indices
+    let audio_indices = get_audio_stream_indices(&config.input_path)?;
+    let subtitle_indices = get_subtitle_stream_indices(&config.input_path)?;
+    
+    // Construire la commande FFmpeg
+    let mut cmd = Command::new("ffmpeg");
+    
+    // Options de base
+    cmd.args(&["-i", &config.input_path]);
+    
+    // Ajouter la piste vidéo principale
+    cmd.args(&["-map", "0:v:0"]);
+    
+    // Sélection des pistes audio (utiliser les vrais indices)
+    for &selected_index in &config.selected_audio_tracks {
+        if let Some(&real_index) = audio_indices.get(selected_index as usize) {
+            cmd.args(&["-map", &format!("0:a:{}", real_index)]);
+        }
+    }
+    
+    // Sélection des pistes de sous-titres (utiliser les vrais indices)
+    for &selected_index in &config.selected_subtitle_tracks {
+        if let Some(&real_index) = subtitle_indices.get(selected_index as usize) {
+            cmd.args(&["-map", &format!("0:s:{}", real_index)]);
+        }
+    }
+    
+    // Codec vidéo
+    let video_codec = match config.codec.as_str() {
+        "h264" => "libx264",
+        "h265" => "libx265",
+        "vp9" => "libvpx-vp9",
+        _ => "libx264",
+    };
+    
+    // Codec audio
+    let audio_codec = match config.audio_codec.as_str() {
+        "aac" => "aac",
+        "ac3" => "ac3",
+        "mp3" => "mp3",
+        "opus" => "libopus",
+        _ => "aac",
+    };
+    
+    // Résolution basée sur la qualité
+    let resolution = match config.quality.as_str() {
+        "4K" => "3840:2160",
+        "1080p" => "1920:1080",
+        "720p" => "1280:720",
+        "480p" => "854:480",
+        _ => "1920:1080",
+    };
+    
+    // Arguments de conversion
+    cmd.args(&[
+        "-c:v", video_codec,
+        "-crf", &config.crf.to_string(),
+        "-preset", "medium",
+        "-c:a", audio_codec,
+        "-b:a", "128k",
+        "-vf", &format!("scale={}", resolution),
+        "-progress", "pipe:1",
+        "-y", // Écraser le fichier de sortie
+        &config.output_path,
+    ]);
+    
+    // Log de la commande pour debug
+    println!("Commande FFmpeg: {:?}", cmd);
+    
+    // Démarrer le processus
+    let mut child = cmd
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Erreur lors du démarrage de FFmpeg: {}", e))?;
+    
+    let stdout = child.stdout.take().ok_or("Impossible de capturer la sortie")?;
+    let stderr = child.stderr.take().ok_or("Impossible de capturer les erreurs")?;
+    let reader = BufReader::new(stdout);
+    let stderr_reader = BufReader::new(stderr);
+    
+    let mut total_time = 0.0;
+    let mut current_time = 0.0;
+    
+    // Lire la sortie en temps réel
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("Erreur de lecture: {}", e))?;
+        
+        if line.starts_with("out_time_ms=") {
+            if let Some(time_str) = line.split('=').nth(1) {
+                if let Ok(time_ms) = time_str.parse::<u64>() {
+                    current_time = time_ms as f64 / 1000000.0; // Convertir en secondes
+                }
+            }
+        } else if line.starts_with("duration=") {
+            if let Some(duration_str) = line.split('=').nth(1) {
+                if let Ok(duration) = duration_str.parse::<f64>() {
+                    total_time = duration;
+                }
+            }
+        }
+        
+        // Calculer la progression
+        if total_time > 0.0 {
+            let progress = (current_time / total_time).min(1.0);
+            let elapsed = start_time.elapsed().as_secs_f64();
+            let eta = if progress > 0.0 { elapsed / progress - elapsed } else { 0.0 };
+            
+            let progress_data = ConversionProgress {
+                progress,
+                current_time,
+                total_time,
+                speed: 0.0, // FFmpeg ne fournit pas directement cette info
+                eta,
+                status: format!("Conversion en cours... {:.1}%", progress * 100.0),
+            };
+            
+            // Envoyer la progression à la fenêtre
+            window.emit("conversion_progress", progress_data).ok();
+        }
+    }
+    
+    // Attendre la fin du processus
+    let status = child.wait().map_err(|e| format!("Erreur lors de l'attente: {}", e))?;
+    
+    let duration = start_time.elapsed().as_secs_f64();
+    
+    // Lire les erreurs de stderr
+    let mut error_output = String::new();
+    for line in stderr_reader.lines() {
+        if let Ok(line) = line {
+            error_output.push_str(&line);
+            error_output.push('\n');
+        }
+    }
+    
+    if status.success() {
+        Ok(ConversionResult {
+            success: true,
+            output_path: Some(config.output_path),
+            error: None,
+            duration,
+        })
+    } else {
+        let error_message = if !error_output.is_empty() {
+            format!("La conversion a échoué: {}", error_output)
+        } else {
+            format!("La conversion a échoué (code de sortie: {})", status)
+        };
+        
+        Ok(ConversionResult {
+            success: false,
+            output_path: None,
+            error: Some(error_message),
+            duration,
+        })
+    }
+} 
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConversionConfig {
+    pub input_path: String,
+    pub output_path: String,
+    pub format: String,
+    pub quality: String,
+    pub codec: String,
+    pub audio_codec: String,
+    pub crf: u32,
+    pub selected_audio_tracks: Vec<u32>,
+    pub selected_subtitle_tracks: Vec<u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConversionProgress {
+    pub progress: f64, // 0.0 à 1.0
+    pub current_time: f64, // en secondes
+    pub total_time: f64, // en secondes
+    pub speed: f64, // fps
+    pub eta: f64, // en secondes
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConversionResult {
+    pub success: bool,
+    pub output_path: Option<String>,
+    pub error: Option<String>,
+    pub duration: f64, // en secondes
 } 
