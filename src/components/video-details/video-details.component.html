@@ -22,39 +22,39 @@
   </app-movie-info>
   }
 
-  <!-- Détails techniques -->
+  <!-- Technical Details -->
   <div class="technical-details">
-    <h5>Informations techniques</h5>
+    <h5>Technical Information</h5>
 
     <div class="details-grid">
       <div class="detail-item">
-        <strong>Fichier:</strong>
+        <strong>File:</strong>
         <span>{{ selectedVideo().name }}</span>
       </div>
 
       <div class="detail-item">
-        <strong>Chemin:</strong>
+        <strong>Path:</strong>
         <span class="file-path">{{ selectedVideo().path }}</span>
       </div>
 
       <div class="detail-item">
-        <strong>Taille actuelle:</strong>
+        <strong>Current Size:</strong>
         <span>{{ formatFileSize(selectedVideo().size || 0) }}</span>
       </div>
 
       <div class="detail-item">
-        <strong>Durée:</strong>
+        <strong>Duration:</strong>
         <span>{{ formatDuration(selectedVideo().duration || 0) }}</span>
       </div>
 
       <div class="detail-item">
-        <strong>Résolution:</strong>
-        <span>{{ selectedVideo().resolution || "Non détectée" }}</span>
+        <strong>Resolution:</strong>
+        <span>{{ selectedVideo().resolution || "Not detected" }}</span>
       </div>
 
       <div class="detail-item">
         <strong>Codec:</strong>
-        <span>{{ selectedVideo().codec || "Non détecté" }}</span>
+        <span>{{ selectedVideo().codec || "Not detected" }}</span>
       </div>
 
       <div class="detail-item">
@@ -63,7 +63,7 @@
           {{
             selectedVideo().bitrate
               ? ((selectedVideo().bitrate || 0) / 1000).toFixed(0) + " kbps"
-              : "Non détecté"
+              : "Not detected"
           }}
         </span>
       </div>
@@ -74,29 +74,29 @@
           {{
             selectedVideo().fps
               ? (selectedVideo().fps || 0).toFixed(2) + " fps"
-              : "Non détecté"
+              : "Not detected"
           }}
         </span>
       </div>
 
       @if (selectedVideo().error) {
       <div class="detail-item error">
-        <strong>Erreur:</strong>
+        <strong>Error:</strong>
         <span class="error-text">{{ selectedVideo().error }}</span>
       </div>
       }
     </div>
   </div>
 
-  <!-- Pistes audio -->
+  <!-- Audio Tracks -->
   @if (audioTracks.length > 0) {
   <div class="audio-tracks-section">
     <div class="section-header" (click)="toggleAudioSection()">
       <div class="header-content">
         <mat-icon class="section-icon">audiotrack</mat-icon>
-        <h5>Pistes audio ({{ audioTracks.length }})</h5>
+        <h5>Audio Tracks ({{ audioTracks.length }})</h5>
         <div class="track-count">
-          {{ getSelectedAudioTracksCount() }} sélectionnée(s)
+          {{ getSelectedAudioTracksCount() }} selected
         </div>
       </div>
       <mat-icon class="expand-icon" [class.expanded]="audioSectionExpanded()">
@@ -111,7 +111,7 @@
           [indeterminate]="areSomeAudioTracksSelected()"
           (change)="toggleAllAudioTracks($event.checked)"
         >
-          Tout sélectionner
+          Select All
         </mat-checkbox>
       </div>
 
@@ -124,7 +124,7 @@
           >
           </mat-checkbox>
           <mat-icon class="track-icon">audiotrack</mat-icon>
-          <span class="track-index">Piste {{ track.index }}</span>
+          <span class="track-index">Track {{ track.index }}</span>
           @if (track.language) {
           <mat-chip class="language-chip">{{
             track.language.toUpperCase()
@@ -137,11 +137,11 @@
           </div>
           @if (track.channels) {
           <div class="track-info">
-            <strong>Canaux:</strong> {{ track.channels }}
+            <strong>Channels:</strong> {{ track.channels }}
           </div>
           } @if (track.sample_rate) {
           <div class="track-info">
-            <strong>Fréquence:</strong>
+            <strong>Sample Rate:</strong>
             {{ ((track.sample_rate || 0) / 1000).toFixed(1) }} kHz
           </div>
           } @if (track.bitrate) {
@@ -151,7 +151,7 @@
           </div>
           } @if (track.title) {
           <div class="track-info">
-            <strong>Titre:</strong> {{ track.title }}
+            <strong>Title:</strong> {{ track.title }}
           </div>
           }
         </div>
@@ -161,15 +161,15 @@
   </div>
   }
 
-  <!-- Sous-titres -->
+  <!-- Subtitles -->
   @if (subtitleTracks.length > 0) {
   <div class="subtitle-tracks-section">
     <div class="section-header" (click)="toggleSubtitleSection()">
       <div class="header-content">
         <mat-icon class="section-icon">subtitles</mat-icon>
-        <h5>Sous-titres ({{ subtitleTracks.length }})</h5>
+        <h5>Subtitles ({{ subtitleTracks.length }})</h5>
         <div class="track-count">
-          {{ getSelectedSubtitleTracksCount() }} sélectionné(s)
+          {{ getSelectedSubtitleTracksCount() }} selected
         </div>
       </div>
       <mat-icon
@@ -187,7 +187,7 @@
           [indeterminate]="areSomeSubtitleTracksSelected()"
           (change)="toggleAllSubtitleTracks($event.checked)"
         >
-          Tout sélectionner
+          Select All
         </mat-checkbox>
       </div>
 
@@ -200,15 +200,15 @@
           >
           </mat-checkbox>
           <mat-icon class="track-icon">subtitles</mat-icon>
-          <span class="track-index">Piste {{ track.index }}</span>
+          <span class="track-index">Track {{ track.index }}</span>
           @if (track.language) {
           <mat-chip class="language-chip">{{
             track.language.toUpperCase()
           }}</mat-chip>
           } @if (track.is_default) {
-          <mat-chip class="default-chip" color="primary">Par défaut</mat-chip>
+          <mat-chip class="default-chip" color="primary">Default</mat-chip>
           } @if (track.is_forced) {
-          <mat-chip class="forced-chip" color="accent">Forcé</mat-chip>
+          <mat-chip class="forced-chip" color="accent">Forced</mat-chip>
           }
         </div>
         <div class="track-details">
@@ -217,7 +217,7 @@
           </div>
           @if (track.title) {
           <div class="track-info">
-            <strong>Titre:</strong> {{ track.title }}
+            <strong>Title:</strong> {{ track.title }}
           </div>
           }
         </div>
@@ -227,13 +227,13 @@
   </div>
   }
 
-  <!-- Configuration de sortie -->
+  <!-- Output Configuration -->
   @if (generatedFilename()) {
   <div class="output-config-section">
-    <h5>Configuration de sortie</h5>
+    <h5>Output Configuration</h5>
 
     <div class="config-grid">
-      <!-- Format de sortie -->
+      <!-- Output Format -->
       <mat-form-field appearance="outline">
         <mat-label>Format</mat-label>
         <mat-select
@@ -247,9 +247,9 @@
         </mat-select>
       </mat-form-field>
 
-      <!-- Qualité -->
+      <!-- Quality -->
       <mat-form-field appearance="outline">
-        <mat-label>Qualité</mat-label>
+        <mat-label>Quality</mat-label>
         <mat-select
           [(ngModel)]="outputConfig().quality"
           (selectionChange)="onConfigChange({ quality: $event.value })"
@@ -261,9 +261,9 @@
         </mat-select>
       </mat-form-field>
 
-      <!-- Codec vidéo -->
+      <!-- Video Codec -->
       <mat-form-field appearance="outline">
-        <mat-label>Codec vidéo</mat-label>
+        <mat-label>Video Codec</mat-label>
         <mat-select
           [(ngModel)]="outputConfig().codec"
           (selectionChange)="onConfigChange({ codec: $event.value })"
@@ -274,9 +274,9 @@
         </mat-select>
       </mat-form-field>
 
-      <!-- Codec audio -->
+      <!-- Audio Codec -->
       <mat-form-field appearance="outline">
-        <mat-label>Codec audio</mat-label>
+        <mat-label>Audio Codec</mat-label>
         <mat-select
           [(ngModel)]="outputConfig().audio"
           (selectionChange)="onConfigChange({ audio: $event.value })"
@@ -288,9 +288,9 @@
         </mat-select>
       </mat-form-field>
 
-      <!-- Taux de compression -->
+      <!-- Compression Rate -->
       <mat-form-field appearance="outline">
-        <mat-label>Taux de compression (CRF)</mat-label>
+        <mat-label>Compression Rate (CRF)</mat-label>
         <input
           matInput
           type="number"
@@ -301,26 +301,27 @@
           placeholder="20"
         />
         <mat-hint
-          >0 = sans perte, 51 = compression maximale (20 = qualité
-          excellente)</mat-hint
+          >0 = lossless, 51 = maximum compression (20 = excellent
+          quality)</mat-hint
         >
       </mat-form-field>
     </div>
 
-    <!-- Nom de fichier généré -->
+    <!-- Generated Filename -->
     <div class="filename-section">
-      <h6>Nom de fichier de sortie</h6>
+      <h6>Output Filename</h6>
       <div class="filename-display">
         <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Nom du fichier</mat-label>
+          <mat-label>Filename</mat-label>
           <input
             matInput
             [value]="generatedFilename()?.filename"
             (input)="onFilenameChange($event)"
-            placeholder="Nom du fichier de sortie"
+            placeholder="Output filename"
           />
           <mat-hint
-            >Le nom sera généré automatiquement selon vos paramètres</mat-hint
+            >The name will be automatically generated based on your
+            settings</mat-hint
           >
         </mat-form-field>
 
@@ -335,7 +336,7 @@
             class="select-button"
           >
             <mat-icon>folder_open</mat-icon>
-            Choisir
+            Choose
           </button>
         </div>
       </div>
@@ -343,7 +344,7 @@
   </div>
   }
 
-  <!-- Section de conversion -->
+  <!-- Conversion Section -->
   <div class="conversion-section">
     <h5>Conversion</h5>
 
@@ -351,7 +352,7 @@
     <div class="conversion-progress">
       <div class="progress-header">
         <span class="progress-status">{{
-          conversionState.progress?.status || "Conversion en cours..."
+          conversionState.progress?.status || "Converting..."
         }}</span>
         <span class="progress-percentage">{{
           formatProgress(conversionState.progress?.progress || 0)
@@ -368,18 +369,19 @@
       <div class="progress-details">
         <div class="progress-info">
           <span
-            >Temps écoulé:
+            >Elapsed Time:
             {{ formatTime(conversionState.progress.current_time) }}</span
           >
           <span
-            >Durée totale:
+            >Total Duration:
             {{ formatTime(conversionState.progress.total_time) }}</span
           >
         </div>
         @if (conversionState.progress.eta > 0) {
         <div class="progress-eta">
           <span
-            >Temps restant: {{ formatTime(conversionState.progress.eta) }}</span
+            >Time Remaining:
+            {{ formatTime(conversionState.progress.eta) }}</span
           >
         </div>
         }
@@ -394,7 +396,7 @@
           class="stop-button"
         >
           <mat-icon>stop</mat-icon>
-          Arrêter
+          Stop
         </button>
       </div>
     </div>
@@ -408,7 +410,7 @@
         class="start-button"
       >
         <mat-icon>play_arrow</mat-icon>
-        Démarrer la conversion
+        Start Conversion
       </button>
     </div>
     } @if (conversionState.result) {
@@ -421,16 +423,16 @@
       <div class="result-success">
         <mat-icon>check_circle</mat-icon>
         <div class="result-content">
-          <h6>Conversion réussie !</h6>
-          <p>Fichier créé: {{ conversionState.result.output_path }}</p>
-          <p>Durée: {{ formatTime(conversionState.result.duration) }}</p>
+          <h6>Conversion Successful!</h6>
+          <p>File created: {{ conversionState.result.output_path }}</p>
+          <p>Duration: {{ formatTime(conversionState.result.duration) }}</p>
         </div>
       </div>
       } @else {
       <div class="result-error">
         <mat-icon>error</mat-icon>
         <div class="result-content">
-          <h6>Échec de la conversion</h6>
+          <h6>Conversion Failed</h6>
           <p>{{ conversionState.result.error }}</p>
         </div>
       </div>
@@ -442,6 +444,6 @@
 } @else {
 <div class="no-selection">
   <mat-icon>info</mat-icon>
-  <p>Sélectionnez une vidéo pour voir les détails d'optimisation</p>
+  <p>Select a video to view optimization details</p>
 </div>
 }

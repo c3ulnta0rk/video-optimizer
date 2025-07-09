@@ -1,22 +1,22 @@
 <div class="settings-dialog">
   <h2 mat-dialog-title>
     <mat-icon>settings</mat-icon>
-    Paramètres
+    Settings
   </h2>
 
   <mat-dialog-content>
     <div class="settings-form">
-      <!-- Clé API TMDB -->
+      <!-- TMDB API Key -->
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Clé API The Movie Database</mat-label>
+        <mat-label>The Movie Database API Key</mat-label>
         <input
           matInput
           [(ngModel)]="settings().tmdbApiKey"
-          placeholder="Entrez votre clé API TMDB"
+          placeholder="Enter your TMDB API key"
           type="password"
         />
         <mat-hint>
-          Obtenez votre clé API gratuite sur
+          Get your free API key at
           <a
             href="https://www.themoviedb.org/settings/api"
             target="_blank"
@@ -27,25 +27,25 @@
         </mat-hint>
       </mat-form-field>
 
-      <!-- Préférences de thème -->
+      <!-- Theme Preferences -->
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Thème</mat-label>
+        <mat-label>Theme</mat-label>
         <mat-select [(ngModel)]="settings().theme">
-          <mat-option value="auto">Auto (système)</mat-option>
-          <mat-option value="light">Clair</mat-option>
-          <mat-option value="dark">Sombre</mat-option>
+          <mat-option value="auto">Auto (system)</mat-option>
+          <mat-option value="light">Light</mat-option>
+          <mat-option value="dark">Dark</mat-option>
         </mat-select>
-        <mat-hint>Choisissez votre préférence de thème</mat-hint>
+        <mat-hint>Choose your theme preference</mat-hint>
       </mat-form-field>
 
-      <!-- Chemin de sortie par défaut -->
+      <!-- Default Output Path -->
       <div class="output-path-section">
-        <label class="form-label">Chemin de sortie par défaut</label>
+        <label class="form-label">Default Output Path</label>
         <div class="path-selector">
           <div class="path-display">
             <mat-icon>folder</mat-icon>
             <span class="path-text">
-              {{ settings().defaultOutputPath || "Même dossier que la source" }}
+              {{ settings().defaultOutputPath || "Same folder as source" }}
             </span>
           </div>
           <button
@@ -55,12 +55,12 @@
             class="select-button"
           >
             <mat-icon>folder_open</mat-icon>
-            Choisir
+            Choose
           </button>
         </div>
         <div class="path-hint">
-          Chemin par défaut pour sauvegarder les fichiers convertis. Laissez
-          vide pour utiliser le même dossier que le fichier source.
+          Default path to save converted files. Leave empty to use the same
+          folder as the source file.
         </div>
       </div>
     </div>
@@ -69,12 +69,12 @@
   <mat-dialog-actions align="end">
     <button mat-button (click)="onReset()" color="warn">
       <mat-icon>restore</mat-icon>
-      Réinitialiser
+      Reset
     </button>
-    <button mat-button (click)="onCancel()">Annuler</button>
+    <button mat-button (click)="onCancel()">Cancel</button>
     <button mat-raised-button (click)="onSave()" color="primary">
       <mat-icon>save</mat-icon>
-      Enregistrer
+      Save
     </button>
   </mat-dialog-actions>
 </div>

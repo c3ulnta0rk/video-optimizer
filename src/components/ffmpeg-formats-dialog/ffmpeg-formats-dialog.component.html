@@ -1,31 +1,31 @@
 <div class="ffmpeg-formats-dialog">
   <h2 mat-dialog-title>
     <mat-icon>video_file</mat-icon>
-    Formats de sortie FFmpeg
+    FFmpeg Output Formats
   </h2>
 
   <mat-dialog-content>
-    <!-- État de chargement -->
+    <!-- Loading State -->
     <div *ngIf="ffmpegInfo().loading" class="loading-container">
       <mat-spinner diameter="40"></mat-spinner>
-      <p>Vérification des formats FFmpeg...</p>
+      <p>Checking FFmpeg formats...</p>
     </div>
 
-    <!-- Erreur -->
+    <!-- Error -->
     <div *ngIf="ffmpegInfo().error" class="error-container">
       <mat-icon color="warn">error</mat-icon>
       <p>{{ ffmpegInfo().error }}</p>
       <button mat-raised-button color="primary" (click)="refreshFormats()">
         <mat-icon>refresh</mat-icon>
-        Réessayer
+        Retry
       </button>
     </div>
 
     <!-- Contenu principal -->
     <div *ngIf="!ffmpegInfo().loading && !ffmpegInfo().error">
-      <!-- Barre de recherche -->
+      <!-- Search Bar -->
       <mat-form-field appearance="outline" class="search-field">
-        <mat-label>Rechercher un format</mat-label>
+        <mat-label>Search for a format</mat-label>
         <input
           matInput
           [(ngModel)]="searchQuery"
@@ -36,8 +36,8 @@
 
       <!-- Onglets -->
       <mat-tab-group [(selectedIndex)]="selectedTab" class="formats-tabs">
-        <!-- Onglet Formats courants -->
-        <mat-tab label="Courants">
+        <!-- Common Formats Tab -->
+        <mat-tab label="Common">
           <div class="formats-grid">
             <mat-card
               *ngFor="let format of getCommonFormats()"
@@ -64,8 +64,8 @@
           </div>
         </mat-tab>
 
-        <!-- Onglet Haute qualité -->
-        <mat-tab label="Haute qualité">
+        <!-- High Quality Tab -->
+        <mat-tab label="High Quality">
           <div class="formats-grid">
             <mat-card
               *ngFor="let format of getHighQualityFormats()"
@@ -92,7 +92,7 @@
           </div>
         </mat-tab>
 
-        <!-- Onglet Mobile -->
+        <!-- Mobile Tab -->
         <mat-tab label="Mobile">
           <div class="formats-grid">
             <mat-card
@@ -120,8 +120,8 @@
           </div>
         </mat-tab>
 
-        <!-- Onglet Tous les formats -->
-        <mat-tab label="Tous">
+        <!-- All Formats Tab -->
+        <mat-tab label="All">
           <div class="formats-list">
             <mat-list>
               <mat-list-item
@@ -150,18 +150,18 @@
         </mat-tab>
       </mat-tab-group>
 
-      <!-- Statistiques -->
+      <!-- Statistics -->
       <div class="stats">
-        <p>{{ ffmpegInfo().formats.length }} formats disponibles</p>
+        <p>{{ ffmpegInfo().formats.length }} formats available</p>
       </div>
     </div>
   </mat-dialog-content>
 
   <mat-dialog-actions align="end">
-    <button mat-button (click)="close()">Fermer</button>
+    <button mat-button (click)="close()">Close</button>
     <button mat-raised-button color="primary" (click)="refreshFormats()">
       <mat-icon>refresh</mat-icon>
-      Actualiser
+      Refresh
     </button>
   </mat-dialog-actions>
 </div>

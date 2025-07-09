@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:prod": "ng build --configuration production",
+    "build:appimage": "npm run build:prod && tauri build --target appimage"
   },
   "private": true,
   "dependencies": {
