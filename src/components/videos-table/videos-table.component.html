@@ -114,10 +114,10 @@
         </td>
       </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
       <tr
         mat-row
-        *matRowDef="let row; columns: displayedColumns"
+        *matRowDef="let row; columns: displayedColumns()"
         class="video-row"
         [class.selected-row]="selectedVideo()?.path === row.path"
         (click)="onVideoClick(row)"

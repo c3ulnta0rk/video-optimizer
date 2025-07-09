@@ -4,6 +4,27 @@ use std::path::Path;
 use tauri::command;
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct AudioTrack {
+    pub index: u32,
+    pub codec: String,
+    pub language: Option<String>,
+    pub channels: Option<u32>,
+    pub sample_rate: Option<u32>,
+    pub bitrate: Option<u64>,
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SubtitleTrack {
+    pub index: u32,
+    pub codec: String,
+    pub language: Option<String>,
+    pub title: Option<String>,
+    pub is_default: bool,
+    pub is_forced: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VideoMetadata {
     pub path: String,
     pub name: String,
@@ -13,6 +34,8 @@ pub struct VideoMetadata {
     pub codec: Option<String>,
     pub bitrate: Option<u64>,
     pub fps: Option<f64>,
+    pub audio_tracks: Vec<AudioTrack>,
+    pub subtitle_tracks: Vec<SubtitleTrack>,
     pub error: Option<String>,
 }
 
@@ -72,6 +95,8 @@ pub async fn get_video_metadata(path: String) -> Result<VideoMetadata, String> {
                 codec: None,
                 bitrate: None,
                 fps: None,
+                audio_tracks: Vec::new(),
+                subtitle_tracks: Vec::new(),
                 error: Some(e),
             }
         }
@@ -151,6 +176,39 @@ fn get_ffprobe_metadata(path: &Path) -> Result<VideoMetadata, String> {
         }
     });
 
+    let mut audio_tracks = Vec::new();
+    let mut subtitle_tracks = Vec::new();
+
+    for stream in streams {
+        let codec_type = stream.get("codec_type").and_then(|t| t.as_str());
+        let codec_name = stream.get("codec_name").and_then(|c| c.as_str());
+        let language = stream.get("tags").and_then(|t| t.get("language")).and_then(|l| l.as_str());
+        let title = stream.get("tags").and_then(|t| t.get("title")).and_then(|l| l.as_str());
+        let is_default = stream.get("disposition").and_then(|d| d.get("default")).and_then(|b| b.as_bool()).unwrap_or(false);
+        let is_forced = stream.get("disposition").and_then(|d| d.get("forced")).and_then(|b| b.as_bool()).unwrap_or(false);
+
+        if codec_type == Some("audio") {
+            audio_tracks.push(AudioTrack {
+                index: stream.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32,
+                codec: codec_name.unwrap_or("Unknown").to_string(),
+                language: language.map(|s| s.to_string()),
+                channels: stream.get("channels").and_then(|c| c.as_u64()).and_then(|c| Some(c as u32)),
+                sample_rate: stream.get("sample_rate").and_then(|s| s.as_u64()).and_then(|s| Some(s as u32)),
+                bitrate: stream.get("bit_rate").and_then(|b| b.as_u64()),
+                title: title.map(|s| s.to_string()),
+            });
+        } else if codec_type == Some("subtitle") {
+            subtitle_tracks.push(SubtitleTrack {
+                index: stream.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as u32,
+                codec: codec_name.unwrap_or("Unknown").to_string(),
+                language: language.map(|s| s.to_string()),
+                title: title.map(|s| s.to_string()),
+                is_default,
+                is_forced,
+            });
+        }
+    }
+
     Ok(VideoMetadata {
         path: String::new(), // Sera rempli par l'appelant
         name: String::new(), // Sera rempli par l'appelant
@@ -160,6 +218,8 @@ fn get_ffprobe_metadata(path: &Path) -> Result<VideoMetadata, String> {
         codec,
         bitrate,
         fps,
+        audio_tracks,
+        subtitle_tracks,
         error: None,
     })
 }

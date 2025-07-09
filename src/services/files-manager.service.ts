@@ -12,6 +12,25 @@ import { FfmpegFormatsService, FfmpegFormat } from "./ffmpeg-formats.service";
 import { FfmpegFormatsDialogComponent } from "../components/ffmpeg-formats-dialog/ffmpeg-formats-dialog.component";
 import { firstValueFrom } from "rxjs";
 
+export interface AudioTrack {
+  index: number;
+  codec: string;
+  language?: string;
+  channels?: number;
+  sample_rate?: number;
+  bitrate?: number;
+  title?: string;
+}
+
+export interface SubtitleTrack {
+  index: number;
+  codec: string;
+  language?: string;
+  title?: string;
+  is_default: boolean;
+  is_forced: boolean;
+}
+
 export interface VideoFile {
   path: string;
   name: string;
@@ -21,6 +40,8 @@ export interface VideoFile {
   codec?: string;
   bitrate?: number;
   fps?: number;
+  audio_tracks?: AudioTrack[];
+  subtitle_tracks?: SubtitleTrack[];
   error?: string;
   loading: boolean;
   movieInfo?: MovieInfo;
@@ -249,6 +270,8 @@ export class FilesManagerService {
         codec?: string;
         bitrate?: number;
         fps?: number;
+        audio_tracks?: AudioTrack[];
+        subtitle_tracks?: SubtitleTrack[];
         error?: string;
       }>("get_video_metadata", { path: filePath });
 
@@ -260,6 +283,8 @@ export class FilesManagerService {
         codec: metadata.codec || "Unknown",
         bitrate: metadata.bitrate || 0,
         fps: metadata.fps || 0,
+        audio_tracks: metadata.audio_tracks || [],
+        subtitle_tracks: metadata.subtitle_tracks || [],
         error: metadata.error,
         loading: false,
       });

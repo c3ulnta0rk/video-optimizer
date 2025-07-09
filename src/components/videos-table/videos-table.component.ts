@@ -6,6 +6,7 @@ import {
   output,
   effect,
   inject,
+  computed,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatTableModule } from "@angular/material/table";
@@ -42,13 +43,19 @@ import { VideoDetailsComponent } from "../video-details/video-details.component"
 export class VideosTableComponent {
   public readonly videoSelected = output<VideoFile>();
   public readonly videoRemoved = output<string>();
-
-  public readonly videoFiles = this.filesManager.videoFiles;
-  public readonly displayedColumns = ["name", "size", "movieTitle", "actions"];
-
-  public readonly selectedVideo = this.filesManager.selectedVideo;
-
   private readonly dialog = inject(MatDialog);
+
+  public readonly displayedColumns = signal<string[]>([
+    "name",
+    "size",
+    "movieTitle",
+    "actions",
+  ]);
+  public readonly videoFiles = computed(() => this.filesManager.videoFiles());
+
+  public readonly selectedVideo = computed(() =>
+    this.filesManager.selectedVideo()
+  );
 
   constructor(private filesManager: FilesManagerService) {
     effect(() => {

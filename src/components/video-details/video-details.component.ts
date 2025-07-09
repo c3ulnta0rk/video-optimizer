@@ -12,6 +12,7 @@ import { FormsModule } from "@angular/forms";
 import { MatIconModule } from "@angular/material/icon";
 import { MatButtonModule } from "@angular/material/button";
 import { MatChipsModule } from "@angular/material/chips";
+import { MatCheckboxModule } from "@angular/material/checkbox";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
 import { MatFormFieldModule } from "@angular/material/form-field";
 import { MatInputModule } from "@angular/material/input";
@@ -36,6 +37,7 @@ import {
     MatIconModule,
     MatButtonModule,
     MatChipsModule,
+    MatCheckboxModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -66,6 +68,23 @@ export class VideoDetailsComponent {
 
   public readonly generatedFilename = signal<GeneratedFilename | null>(null);
 
+  // États des sections expansibles
+  public audioSectionExpanded = signal(false);
+  public subtitleSectionExpanded = signal(false);
+
+  // Sélections des pistes
+  private selectedAudioTracks = new Set<number>();
+  private selectedSubtitleTracks = new Set<number>();
+
+  // Getters pour s'assurer que les propriétés sont toujours initialisées
+  get audioTracks() {
+    return this.selectedVideo()?.audio_tracks || [];
+  }
+
+  get subtitleTracks() {
+    return this.selectedVideo()?.subtitle_tracks || [];
+  }
+
   constructor() {
     // Charger la configuration depuis le store
     this.loadConfigFromStore();
@@ -76,6 +95,9 @@ export class VideoDetailsComponent {
       const config = this.outputConfig();
 
       if (video) {
+        // Initialiser les sélections des pistes dès qu'une vidéo est sélectionnée
+        this.initializeTracksSelections();
+
         // Générer le nom de fichier même sans movieInfo
         let filename: GeneratedFilename;
 
@@ -105,6 +127,7 @@ export class VideoDetailsComponent {
       } else {
         // Aucune vidéo sélectionnée, réinitialiser
         this.generatedFilename.set(null);
+        this.clearTracksSelections();
       }
     });
   }
@@ -213,6 +236,124 @@ export class VideoDetailsComponent {
           ),
         });
       }
+    }
+  }
+
+  // Méthodes pour les sections expansibles
+  toggleAudioSection(): void {
+    this.audioSectionExpanded.set(!this.audioSectionExpanded());
+  }
+
+  toggleSubtitleSection(): void {
+    this.subtitleSectionExpanded.set(!this.subtitleSectionExpanded());
+  }
+
+  // Initialisation des sélections par défaut
+  private initializeTracksSelections(): void {
+    this.initializeAudioTracksSelection();
+    this.initializeSubtitleTracksSelection();
+  }
+
+  private clearTracksSelections(): void {
+    this.selectedAudioTracks.clear();
+    this.selectedSubtitleTracks.clear();
+  }
+
+  private initializeAudioTracksSelection(): void {
+    this.selectedAudioTracks.clear();
+    // Par défaut, sélectionner toutes les pistes audio
+    this.audioTracks.forEach((track) => {
+      this.selectedAudioTracks.add(track.index);
+    });
+  }
+
+  private initializeSubtitleTracksSelection(): void {
+    this.selectedSubtitleTracks.clear();
+    // Par défaut, sélectionner toutes les pistes de sous-titres
+    this.subtitleTracks.forEach((track) => {
+      this.selectedSubtitleTracks.add(track.index);
+    });
+  }
+
+  // Méthodes pour les pistes audio
+  getSelectedAudioTracksCount(): number {
+    return this.selectedAudioTracks.size;
+  }
+
+  isAudioTrackSelected(index: number): boolean {
+    return this.selectedAudioTracks.has(index);
+  }
+
+  toggleAudioTrack(index: number, checked: boolean): void {
+    if (checked) {
+      this.selectedAudioTracks.add(index);
+    } else {
+      this.selectedAudioTracks.delete(index);
+    }
+  }
+
+  areAllAudioTracksSelected(): boolean {
+    return (
+      this.selectedAudioTracks.size === this.audioTracks.length &&
+      this.audioTracks.length > 0
+    );
+  }
+
+  areSomeAudioTracksSelected(): boolean {
+    return (
+      this.selectedAudioTracks.size > 0 &&
+      this.selectedAudioTracks.size < this.audioTracks.length
+    );
+  }
+
+  toggleAllAudioTracks(checked: boolean): void {
+    if (checked) {
+      this.audioTracks.forEach((track) => {
+        this.selectedAudioTracks.add(track.index);
+      });
+    } else {
+      this.selectedAudioTracks.clear();
+    }
+  }
+
+  // Méthodes pour les pistes de sous-titres
+  getSelectedSubtitleTracksCount(): number {
+    return this.selectedSubtitleTracks.size;
+  }
+
+  isSubtitleTrackSelected(index: number): boolean {
+    return this.selectedSubtitleTracks.has(index);
+  }
+
+  toggleSubtitleTrack(index: number, checked: boolean): void {
+    if (checked) {
+      this.selectedSubtitleTracks.add(index);
+    } else {
+      this.selectedSubtitleTracks.delete(index);
+    }
+  }
+
+  areAllSubtitleTracksSelected(): boolean {
+    return (
+      this.selectedSubtitleTracks.size === this.subtitleTracks.length &&
+      this.subtitleTracks.length > 0
+    );
+  }
+
+  areSomeSubtitleTracksSelected(): boolean {
+    return (
+      this.selectedSubtitleTracks.size > 0 &&
+      this.selectedSubtitleTracks.size < this.subtitleTracks.length
+    );
+  }
+
+  toggleAllSubtitleTracks(checked: boolean): void {
+    if (checked) {
+      this.subtitleTracks.forEach((track) => {
+        this.selectedSubtitleTracks.add(track.index);
+      });
+    } else {
+      this.selectedSubtitleTracks.clear();
     }
   }
 }
