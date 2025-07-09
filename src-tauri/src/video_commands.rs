@@ -331,13 +331,13 @@ fn parse_formats_output(output: &str) -> Result<Vec<FfmpegFormat>, String> {
     let mut formats = Vec::new();
     let lines: Vec<&str> = output.lines().collect();
     
-    // Chercher la section des formats de sortie (commence par "File formats:")
+    // Chercher la section des formats (commence par "Formats:")
     let mut in_formats_section = false;
     
     for line in lines {
         let line = line.trim();
         
-        if line.starts_with("File formats:") {
+        if line.starts_with("Formats:") {
             in_formats_section = true;
             continue;
         }
