@@ -1,0 +1,67 @@
+@if (audioTracks().length > 0) {
+<div class="audio-tracks-section">
+  <div class="section-header" (click)="toggleAudioSection()">
+    <div class="header-content">
+      <mat-icon class="section-icon">audiotrack</mat-icon>
+      <h5>Audio Tracks ({{ audioTracks().length }})</h5>
+      <div class="track-count">
+        {{ getSelectedAudioTracksCount() }} selected
+      </div>
+    </div>
+    <mat-icon class="expand-icon" [class.expanded]="audioSectionExpanded()">
+      expand_more
+    </mat-icon>
+  </div>
+
+  <div class="tracks-container" [class.expanded]="audioSectionExpanded()">
+    <div class="tracks-header">
+      <mat-checkbox
+        [checked]="areAllAudioTracksSelected()"
+        [indeterminate]="areSomeAudioTracksSelected()"
+        (change)="toggleAllAudioTracks($event.checked)"
+      >
+        Select All
+      </mat-checkbox>
+    </div>
+
+    @for (track of audioTracks(); track $index) {
+    <div class="track-item">
+      <div class="track-header">
+        <mat-checkbox
+          [checked]="isAudioTrackSelected(track.index)"
+          (change)="toggleAudioTrack(track.index, $event.checked)"
+        >
+        </mat-checkbox>
+        <mat-icon class="track-icon">audiotrack</mat-icon>
+        <span class="track-index">Track {{ track.index }}</span>
+        @if (track.language) {
+        <mat-chip class="language-chip">{{
+          track.language.toUpperCase()
+        }}</mat-chip>
+        }
+      </div>
+      <div class="track-details">
+        <div class="track-info"><strong>Codec:</strong> {{ track.codec }}</div>
+        @if (track.channels) {
+        <div class="track-info">
+          <strong>Channels:</strong> {{ track.channels }}
+        </div>
+        } @if (track.sample_rate) {
+        <div class="track-info">
+          <strong>Sample Rate:</strong>
+          {{ ((track.sample_rate || 0) / 1000).toFixed(1) }} kHz
+        </div>
+        } @if (track.bitrate) {
+        <div class="track-info">
+          <strong>Bitrate:</strong>
+          {{ ((track.bitrate || 0) / 1000).toFixed(0) }} kbps
+        </div>
+        } @if (track.title) {
+        <div class="track-info"><strong>Title:</strong> {{ track.title }}</div>
+        }
+      </div>
+    </div>
+    }
+  </div>
+</div>
+}

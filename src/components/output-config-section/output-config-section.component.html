@@ -1,0 +1,117 @@
+@if (generatedFilename()) {
+<div class="output-config-section">
+  <h5>Output Configuration</h5>
+
+  <div class="config-grid">
+    <!-- Output Format -->
+    <mat-form-field appearance="outline">
+      <mat-label>Format</mat-label>
+      <mat-select
+        [(ngModel)]="outputConfig().format"
+        (selectionChange)="onConfigChange({ format: $event.value })"
+      >
+        <mat-option value="mp4">MP4</mat-option>
+        <mat-option value="mkv">MKV</mat-option>
+        <mat-option value="avi">AVI</mat-option>
+        <mat-option value="mov">MOV</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Quality -->
+    <mat-form-field appearance="outline">
+      <mat-label>Quality</mat-label>
+      <mat-select
+        [(ngModel)]="outputConfig().quality"
+        (selectionChange)="onConfigChange({ quality: $event.value })"
+      >
+        <mat-option value="4K">4K</mat-option>
+        <mat-option value="1080p">1080p</mat-option>
+        <mat-option value="720p">720p</mat-option>
+        <mat-option value="480p">480p</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Video Codec -->
+    <mat-form-field appearance="outline">
+      <mat-label>Video Codec</mat-label>
+      <mat-select
+        [(ngModel)]="outputConfig().codec"
+        (selectionChange)="onConfigChange({ codec: $event.value })"
+      >
+        <mat-option value="h264">H.264 (x264)</mat-option>
+        <mat-option value="h265">H.265 (x265)</mat-option>
+        <mat-option value="vp9">VP9</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Audio Codec -->
+    <mat-form-field appearance="outline">
+      <mat-label>Audio Codec</mat-label>
+      <mat-select
+        [(ngModel)]="outputConfig().audio"
+        (selectionChange)="onConfigChange({ audio: $event.value })"
+      >
+        <mat-option value="aac">AAC</mat-option>
+        <mat-option value="ac3">AC3</mat-option>
+        <mat-option value="mp3">MP3</mat-option>
+        <mat-option value="opus">Opus</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Compression Rate -->
+    <mat-form-field appearance="outline">
+      <mat-label>Compression Rate (CRF)</mat-label>
+      <input
+        matInput
+        type="number"
+        min="0"
+        max="51"
+        [(ngModel)]="outputConfig().crf"
+        (input)="onCrfChange($event)"
+        placeholder="20"
+      />
+      <mat-hint
+        >0 = lossless, 51 = maximum compression (20 = excellent
+        quality)</mat-hint
+      >
+    </mat-form-field>
+  </div>
+
+  <!-- Generated Filename -->
+  <div class="filename-section">
+    <h6>Output Filename</h6>
+    <div class="filename-display">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Filename</mat-label>
+        <input
+          matInput
+          [value]="generatedFilename()?.filename"
+          (input)="onFilenameChange($event)"
+          placeholder="Output filename"
+        />
+        <mat-hint
+          >The name will be automatically generated based on your
+          settings</mat-hint
+        >
+      </mat-form-field>
+
+      <div class="file-path-display flex items-center gap-2">
+        <mat-icon>folder</mat-icon>
+        <span class="flex-1 text-ellipsis"
+          >{{ currentOutputPath() }}/{{ generatedFilename()?.filename }}</span
+        >
+
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="onSelectOutputPath()"
+          class="select-button"
+        >
+          <mat-icon>folder_open</mat-icon>
+          Choose
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+}

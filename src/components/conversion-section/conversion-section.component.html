@@ -1,0 +1,95 @@
+<div class="conversion-section">
+  <h5>Conversion</h5>
+
+  @if (isConverting()) {
+  <div class="conversion-progress">
+    <div class="progress-header">
+      <span class="progress-status">{{
+        conversionState().progress?.status || "Converting..."
+      }}</span>
+      <span class="progress-percentage">{{
+        formatProgress(conversionState().progress?.progress || 0)
+      }}</span>
+    </div>
+
+    <mat-progress-bar
+      mode="determinate"
+      [value]="(conversionState().progress?.progress || 0) * 100"
+      class="progress-bar"
+    ></mat-progress-bar>
+
+    @if (conversionState().progress) {
+    <div class="progress-details">
+      <div class="progress-info">
+        <span
+          >Elapsed Time:
+          {{ formatTime(conversionState().progress.current_time) }}</span
+        >
+        <span
+          >Total Duration:
+          {{ formatTime(conversionState().progress.total_time) }}</span
+        >
+      </div>
+      @if (conversionState().progress.eta > 0) {
+      <div class="progress-eta">
+        <span
+          >Time Remaining:
+          {{ formatTime(conversionState().progress.eta) }}</span
+        >
+      </div>
+      }
+    </div>
+    }
+
+    <div class="conversion-actions">
+      <button
+        mat-raised-button
+        color="warn"
+        (click)="stopConversion.emit()"
+        class="stop-button"
+      >
+        <mat-icon>stop</mat-icon>
+        Stop
+      </button>
+    </div>
+  </div>
+  } @else {
+  <div class="conversion-actions">
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="startConversion.emit()"
+      [disabled]="!hasSelectedVideo()"
+      class="start-button"
+    >
+      <mat-icon>play_arrow</mat-icon>
+      Start Conversion
+    </button>
+  </div>
+  } @if (conversionState().result) {
+  <div
+    class="conversion-result"
+    [class.success]="conversionState().result.success"
+    [class.error]="!conversionState().result.success"
+  >
+    @if (conversionState().result.success) {
+    <div class="result-success">
+      <mat-icon>check_circle</mat-icon>
+      <div class="result-content">
+        <h6>Conversion Successful!</h6>
+        <p>File created: {{ conversionState().result.output_path }}</p>
+        <p>Duration: {{ formatTime(conversionState().result.duration) }}</p>
+      </div>
+    </div>
+    } @else {
+    <div class="result-error">
+      <mat-icon>error</mat-icon>
+      <div class="result-content">
+        <h6>Conversion Failed</h6>
+        <p>{{ conversionState().result.error }}</p>
+      </div>
+    </div>
+    }
+  </div>
+  }
+</div>

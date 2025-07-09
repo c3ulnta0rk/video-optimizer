@@ -21,12 +21,18 @@ import { MatSelectModule } from "@angular/material/select";
 import { VideoFile } from "../../services/files-manager.service";
 import { MovieInfoComponent } from "../movie-info/movie-info.component";
 import { MovieAlternativesDialogComponent } from "../movie-alternatives-dialog/movie-alternatives-dialog.component";
+import { TechnicalDetailsComponent } from "../technical-details/technical-details.component";
+import { AudioTracksSectionComponent } from "../audio-tracks-section/audio-tracks-section.component";
+import { SubtitleTracksSectionComponent } from "../subtitle-tracks-section/subtitle-tracks-section.component";
+import { OutputConfigSectionComponent } from "../output-config-section/output-config-section.component";
+import { ConversionSectionComponent } from "../conversion-section/conversion-section.component";
 import { FilesManagerService } from "../../services/files-manager.service";
 import { SettingsService } from "../../services/settings.service";
 import {
   FilenameGeneratorService,
   OutputFileConfig,
   GeneratedFilename,
+  AudioTrack,
 } from "../../services/filename-generator.service";
 import { ConversionService } from "../../services/conversion.service";
 import { DirectorySelectorService } from "../../services/directory-selector.service";
@@ -47,6 +53,11 @@ import { DirectorySelectorService } from "../../services/directory-selector.serv
     MatInputModule,
     MatSelectModule,
     MovieInfoComponent,
+    TechnicalDetailsComponent,
+    AudioTracksSectionComponent,
+    SubtitleTracksSectionComponent,
+    OutputConfigSectionComponent,
+    ConversionSectionComponent,
   ],
   templateUrl: "./video-details.component.html",
   styleUrls: ["./video-details.component.scss"],
@@ -74,16 +85,12 @@ export class VideoDetailsComponent {
 
   public readonly generatedFilename = signal<GeneratedFilename | null>(null);
 
-  // États des sections expansibles
-  public audioSectionExpanded = signal(false);
-  public subtitleSectionExpanded = signal(false);
-
   // Chemin de sortie personnalisé
   public readonly customOutputPath = signal<string | null>(null);
 
   // Sélections des pistes
-  private selectedAudioTracks = new Set<number>();
-  private selectedSubtitleTracks = new Set<number>();
+  public selectedAudioTracks = new Set<number>();
+  public selectedSubtitleTracks = new Set<number>();
 
   // Getters pour s'assurer que les propriétés sont toujours initialisées
   get audioTracks() {
@@ -117,10 +124,12 @@ export class VideoDetailsComponent {
 
         if (video.movieInfo) {
           // Utiliser les informations du film si disponibles
+          const selectedTracks = this.getSelectedAudioTracks();
           filename = this.filenameGenerator.generateOutputFilename(
             video.movieInfo,
             video.path,
-            config
+            config,
+            selectedTracks
           );
         } else {
           // Fallback: utiliser le nom du fichier original
@@ -201,12 +210,50 @@ export class VideoDetailsComponent {
     }
   }
 
-  formatFileSize(bytes: number): string {
-    return this.filesManager.formatFileSize(bytes);
+  onAudioTracksChanged(tracks: Set<number>): void {
+    this.selectedAudioTracks = tracks;
+
+    // Régénérer le nom de fichier avec les nouvelles pistes audio
+    const video = this.selectedVideo();
+    if (video && video.movieInfo) {
+      const selectedTracks = this.getSelectedAudioTracks();
+      const config = this.outputConfig();
+      const filename = this.filenameGenerator.generateOutputFilename(
+        video.movieInfo,
+        video.path,
+        config,
+        selectedTracks
+      );
+      this.generatedFilename.set(filename);
+    }
   }
 
-  formatDuration(seconds: number): string {
-    return this.filesManager.formatDuration(seconds);
+  /**
+   * Obtient les pistes audio sélectionnées sous forme d'objets AudioTrack
+   */
+  private getSelectedAudioTracks(): AudioTrack[] {
+    const selectedTracks: AudioTrack[] = [];
+
+    this.selectedAudioTracks.forEach((trackIndex) => {
+      const track = this.audioTracks.find((t) => t.index === trackIndex);
+      if (track) {
+        selectedTracks.push({
+          index: track.index,
+          codec: track.codec,
+          language: track.language,
+          title: track.title,
+          channels: track.channels,
+          sample_rate: track.sample_rate,
+          bitrate: track.bitrate,
+        });
+      }
+    });
+
+    return selectedTracks;
+  }
+
+  onSubtitleTracksChanged(tracks: Set<number>): void {
+    this.selectedSubtitleTracks = tracks;
   }
 
   getConfidenceColor(confidence: number): string {
@@ -218,6 +265,19 @@ export class VideoDetailsComponent {
   onConfigChange(newConfig: Partial<OutputFileConfig>): void {
     const updatedConfig = { ...this.outputConfig(), ...newConfig };
     this.outputConfig.set(updatedConfig);
+
+    // Régénérer le nom de fichier avec la nouvelle configuration
+    const video = this.selectedVideo();
+    if (video && video.movieInfo) {
+      const selectedTracks = this.getSelectedAudioTracks();
+      const filename = this.filenameGenerator.generateOutputFilename(
+        video.movieInfo,
+        video.path,
+        updatedConfig,
+        selectedTracks
+      );
+      this.generatedFilename.set(filename);
+    }
 
     // Sauvegarder dans le store
     this.settingsService.updateVideoConfig(newConfig).catch((error) => {
@@ -233,10 +293,7 @@ export class VideoDetailsComponent {
     }
   }
 
-  onFilenameChange(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    const newFilename = target.value;
-
+  onFilenameChange(newFilename: string): void {
     const current = this.generatedFilename();
     if (current) {
       const validation = this.filenameGenerator.validateFilename(newFilename);
@@ -283,15 +340,6 @@ export class VideoDetailsComponent {
     return lastSlashIndex > 0 ? inputPath.substring(0, lastSlashIndex) : ".";
   }
 
-  // Méthodes pour les sections expansibles
-  toggleAudioSection(): void {
-    this.audioSectionExpanded.set(!this.audioSectionExpanded());
-  }
-
-  toggleSubtitleSection(): void {
-    this.subtitleSectionExpanded.set(!this.subtitleSectionExpanded());
-  }
-
   // Initialisation des sélections par défaut
   private initializeTracksSelections(): void {
     this.initializeAudioTracksSelection();
@@ -319,88 +367,6 @@ export class VideoDetailsComponent {
     });
   }
 
-  // Méthodes pour les pistes audio
-  getSelectedAudioTracksCount(): number {
-    return this.selectedAudioTracks.size;
-  }
-
-  isAudioTrackSelected(index: number): boolean {
-    return this.selectedAudioTracks.has(index);
-  }
-
-  toggleAudioTrack(index: number, checked: boolean): void {
-    if (checked) {
-      this.selectedAudioTracks.add(index);
-    } else {
-      this.selectedAudioTracks.delete(index);
-    }
-  }
-
-  areAllAudioTracksSelected(): boolean {
-    return (
-      this.selectedAudioTracks.size === this.audioTracks.length &&
-      this.audioTracks.length > 0
-    );
-  }
-
-  areSomeAudioTracksSelected(): boolean {
-    return (
-      this.selectedAudioTracks.size > 0 &&
-      this.selectedAudioTracks.size < this.audioTracks.length
-    );
-  }
-
-  toggleAllAudioTracks(checked: boolean): void {
-    if (checked) {
-      this.audioTracks.forEach((track) => {
-        this.selectedAudioTracks.add(track.index);
-      });
-    } else {
-      this.selectedAudioTracks.clear();
-    }
-  }
-
-  // Méthodes pour les pistes de sous-titres
-  getSelectedSubtitleTracksCount(): number {
-    return this.selectedSubtitleTracks.size;
-  }
-
-  isSubtitleTrackSelected(index: number): boolean {
-    return this.selectedSubtitleTracks.has(index);
-  }
-
-  toggleSubtitleTrack(index: number, checked: boolean): void {
-    if (checked) {
-      this.selectedSubtitleTracks.add(index);
-    } else {
-      this.selectedSubtitleTracks.delete(index);
-    }
-  }
-
-  areAllSubtitleTracksSelected(): boolean {
-    return (
-      this.selectedSubtitleTracks.size === this.subtitleTracks.length &&
-      this.subtitleTracks.length > 0
-    );
-  }
-
-  areSomeSubtitleTracksSelected(): boolean {
-    return (
-      this.selectedSubtitleTracks.size > 0 &&
-      this.selectedSubtitleTracks.size < this.subtitleTracks.length
-    );
-  }
-
-  toggleAllSubtitleTracks(checked: boolean): void {
-    if (checked) {
-      this.subtitleTracks.forEach((track) => {
-        this.selectedSubtitleTracks.add(track.index);
-      });
-    } else {
-      this.selectedSubtitleTracks.clear();
-    }
-  }
-
   // Méthodes de conversion
   async startConversion(): Promise<void> {
     const video = this.selectedVideo();
@@ -426,13 +392,5 @@ export class VideoDetailsComponent {
 
   stopConversion(): void {
     this.conversionService.stopConversion();
-  }
-
-  formatTime(seconds: number): string {
-    return this.conversionService.formatTime(seconds);
-  }
-
-  formatProgress(progress: number): string {
-    return this.conversionService.formatProgress(progress);
   }
 }

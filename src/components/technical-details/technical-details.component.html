@@ -1,0 +1,62 @@
+<div class="technical-details">
+  <h5>Technical Information</h5>
+
+  <div class="details-grid">
+    <div class="detail-item">
+      <strong>File:</strong>
+      <span>{{ video().name }}</span>
+    </div>
+
+    <div class="detail-item">
+      <strong>Path:</strong>
+      <span class="file-path">{{ video().path }}</span>
+    </div>
+
+    <div class="detail-item">
+      <strong>Current Size:</strong>
+      <span>{{ formatFileSize(video().size || 0) }}</span>
+    </div>
+
+    <div class="detail-item">
+      <strong>Duration:</strong>
+      <span>{{ formatDuration(video().duration || 0) }}</span>
+    </div>
+
+    <div class="detail-item">
+      <strong>Resolution:</strong>
+      <span>{{ video().resolution || "Not detected" }}</span>
+    </div>
+
+    <div class="detail-item">
+      <strong>Codec:</strong>
+      <span>{{ video().codec || "Not detected" }}</span>
+    </div>
+
+    <div class="detail-item">
+      <strong>Bitrate:</strong>
+      <span>
+        {{
+          video().bitrate
+            ? ((video().bitrate || 0) / 1000).toFixed(0) + " kbps"
+            : "Not detected"
+        }}
+      </span>
+    </div>
+
+    <div class="detail-item">
+      <strong>FPS:</strong>
+      <span>
+        {{
+          video().fps ? (video().fps || 0).toFixed(2) + " fps" : "Not detected"
+        }}
+      </span>
+    </div>
+
+    @if (video().error) {
+    <div class="detail-item error">
+      <strong>Error:</strong>
+      <span class="error-text">{{ video().error }}</span>
+    </div>
+    }
+  </div>
+</div>

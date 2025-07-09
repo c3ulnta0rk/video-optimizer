@@ -69,7 +69,7 @@ export class FilesManagerService {
 
       // Charger automatiquement les infos du film après un délai
       setTimeout(() => {
-        this.loadAllMovieInfo();
+        this.loadAllMovieInfoSequentially();
       }, 200); // Délai plus long pour laisser le temps aux métadonnées de se charger
     });
   }
@@ -78,11 +78,13 @@ export class FilesManagerService {
    * Ajoute des chemins de vidéos à la liste
    */
   public async addVideosPaths(paths: string[]) {
-    this.videosPaths.set([...this.videosPaths(), ...paths]);
+    // Ajouter les nouveaux chemins
+    const allPaths = [...this.videosPaths(), ...paths];
+    this.videosPaths.set(allPaths);
 
     // Charger automatiquement les métadonnées pour les nouveaux fichiers
     setTimeout(() => {
-      this.loadVideoMetadata();
+      this.loadVideoMetadataSequentially();
     }, 100);
   }
 
@@ -172,7 +174,9 @@ export class FilesManagerService {
       }
     }
 
-    await this.addVideosPaths(videosPaths);
+    // Trier les fichiers par taille avant de les ajouter
+    const sortedPaths = await this.sortPathsBySize(videosPaths);
+    await this.addVideosPaths(sortedPaths);
   }
 
   /**
@@ -200,6 +204,31 @@ export class FilesManagerService {
     }
 
     return allVideosPaths;
+  }
+
+  /**
+   * Trie les chemins de fichiers par taille (du plus grand au plus petit)
+   */
+  private async sortPathsBySize(paths: string[]): Promise<string[]> {
+    const fileInfos = await Promise.all(
+      paths.map(async (path) => {
+        try {
+          const info = await invoke<{ size: number }>("get_file_info", {
+            path,
+          });
+          return { path, size: info.size };
+        } catch (error) {
+          console.error(
+            `Erreur lors de la récupération de la taille pour ${path}:`,
+            error
+          );
+          return { path, size: 0 };
+        }
+      })
+    );
+
+    // Trier par taille décroissante
+    return fileInfos.sort((a, b) => b.size - a.size).map((info) => info.path);
   }
 
   /**
@@ -250,6 +279,29 @@ export class FilesManagerService {
     for (const file of currentFiles) {
       await this.loadSingleVideoMetadata(file.path);
     }
+  }
+
+  /**
+   * Charge les métadonnées pour tous les fichiers vidéo de manière séquentielle
+   * après avoir trié par taille (du plus grand au plus petit)
+   */
+  public async loadVideoMetadataSequentially() {
+    const currentFiles = this.videoFiles();
+
+    // Trier les fichiers par taille (du plus grand au plus petit)
+    const sortedFiles = [...currentFiles].sort((a, b) => {
+      const sizeA = a.size || 0;
+      const sizeB = b.size || 0;
+      return sizeB - sizeA; // Tri décroissant
+    });
+
+    // Charger les métadonnées séquentiellement
+    for (const file of sortedFiles) {
+      await this.loadSingleVideoMetadata(file.path);
+    }
+
+    // Charger les informations TMDB séquentiellement après les métadonnées
+    await this.loadAllMovieInfoSequentially();
   }
 
   /**
@@ -402,6 +454,28 @@ export class FilesManagerService {
 
     for (const file of currentFiles) {
       await this.loadMovieInfo(file.path);
+    }
+  }
+
+  /**
+   * Charge les informations du film pour tous les fichiers de manière séquentielle
+   * après avoir trié par taille (du plus grand au plus petit)
+   */
+  public async loadAllMovieInfoSequentially(): Promise<void> {
+    const currentFiles = this.videoFiles();
+
+    // Trier les fichiers par taille (du plus grand au plus petit)
+    const sortedFiles = [...currentFiles].sort((a, b) => {
+      const sizeA = a.size || 0;
+      const sizeB = b.size || 0;
+      return sizeB - sizeA; // Tri décroissant
+    });
+
+    // Charger les informations TMDB séquentiellement
+    for (const file of sortedFiles) {
+      await this.loadMovieInfo(file.path);
+      // Ajouter un petit délai entre chaque requête pour éviter de surcharger l'API
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
 

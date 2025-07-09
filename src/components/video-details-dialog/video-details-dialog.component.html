@@ -1,0 +1,19 @@
+<div class="video-details-dialog">
+  <div class="dialog-header">
+    <h2 mat-dialog-title>
+      <mat-icon>video_file</mat-icon>
+      Détails d'optimisation - {{ video.name }}
+    </h2>
+    <button mat-icon-button (click)="onCloseDetails()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-dialog-content>
+    <app-video-details
+      [selectedVideo]="video"
+      (closeDetails)="onCloseDetails()"
+    >
+    </app-video-details>
+  </mat-dialog-content>
+</div>

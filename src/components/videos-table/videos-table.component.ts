@@ -21,7 +21,7 @@ import {
   VideoFile,
 } from "../../services/files-manager.service";
 import { MovieAlternativesDialogComponent } from "../movie-alternatives-dialog/movie-alternatives-dialog.component";
-import { VideoDetailsComponent } from "../video-details/video-details.component";
+import { VideoDetailsDialogComponent } from "../video-details-dialog/video-details-dialog.component";
 
 @Component({
   selector: "app-videos-table",
@@ -35,7 +35,6 @@ import { VideoDetailsComponent } from "../video-details/video-details.component"
     MatTooltipModule,
     MatProgressSpinnerModule,
     MatDialogModule,
-    VideoDetailsComponent,
   ],
   templateUrl: "./videos-table.component.html",
   styleUrls: ["./videos-table.component.scss"],
@@ -53,22 +52,22 @@ export class VideosTableComponent {
   ]);
   public readonly videoFiles = computed(() => this.filesManager.videoFiles());
 
-  public readonly selectedVideo = computed(() =>
-    this.filesManager.selectedVideo()
-  );
-
-  constructor(private filesManager: FilesManagerService) {
-    effect(() => {
-      // Écouter les changements de vidéo sélectionnée pour émettre l'événement
-      const selected = this.selectedVideo();
-      if (selected) {
-        this.videoSelected.emit(selected);
-      }
-    });
-  }
+  constructor(private filesManager: FilesManagerService) {}
 
   public onVideoClick(video: VideoFile): void {
-    this.filesManager.selectVideo(video);
+    // Ouvrir la dialog des détails de vidéo
+    const dialogRef = this.dialog.open(VideoDetailsDialogComponent, {
+      width: "1200px",
+      maxWidth: "95vw",
+      maxHeight: "90vh",
+      disableClose: false,
+      autoFocus: false,
+      data: { video },
+    });
+
+    dialogRef.afterClosed().subscribe(() => {
+      // Optionnel : faire quelque chose quand la dialog se ferme
+    });
   }
 
   public onVideoRemove(video: VideoFile, event: Event): void {
@@ -119,13 +118,9 @@ export class VideosTableComponent {
   }
 
   public onMovieInfoOpenAlternatives(): void {
-    const selectedVideo = this.selectedVideo();
+    const selectedVideo = this.filesManager.selectedVideo();
     if (selectedVideo) {
       this.onOpenMovieAlternatives(selectedVideo, new Event("click"));
     }
-  }
-
-  public onCloseDetails(): void {
-    this.clearSelection();
   }
 }

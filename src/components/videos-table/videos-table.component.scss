@@ -103,20 +103,6 @@
         &:hover {
           background-color: var(--app-hover);
         }
-
-        &.selected-row {
-          background-color: var(--app-primary);
-          color: var(--app-primary-text);
-
-          .file-name,
-          .file-size {
-            color: var(--app-primary-text);
-          }
-
-          .file-icon {
-            color: var(--app-primary-text);
-          }
-        }
       }
     }
   }

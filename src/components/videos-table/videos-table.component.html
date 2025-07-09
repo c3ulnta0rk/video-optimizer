@@ -87,7 +87,6 @@
               color="primary"
               matTooltip="View optimization details"
               (click)="onVideoClick(video)"
-              [class.selected]="selectedVideo()?.path === video.path"
             >
               <mat-icon>info</mat-icon>
             </button>
@@ -119,7 +118,6 @@
         mat-row
         *matRowDef="let row; columns: displayedColumns()"
         class="video-row"
-        [class.selected-row]="selectedVideo()?.path === row.path"
         (click)="onVideoClick(row)"
       ></tr>
     </table>
@@ -132,11 +130,5 @@
       <p class="subtitle">Select video files to start optimization</p>
     </div>
   </ng-template>
-  } @if (selectedVideo()) {
-  <app-video-details
-    [selectedVideo]="selectedVideo()!"
-    (closeDetails)="onCloseDetails()"
-  >
-  </app-video-details>
   }
 </div>
