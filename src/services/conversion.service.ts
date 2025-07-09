@@ -72,7 +72,8 @@ export class ConversionService {
     video: VideoFile,
     config: OutputFileConfig,
     selectedAudioTracks: number[],
-    selectedSubtitleTracks: number[]
+    selectedSubtitleTracks: number[],
+    outputFilename?: string
   ): Promise<void> {
     try {
       // Mettre à jour l'état
@@ -86,7 +87,7 @@ export class ConversionService {
       // Préparer la configuration de conversion
       const conversionConfig: ConversionConfig = {
         input_path: video.path,
-        output_path: this.generateOutputPath(video, config),
+        output_path: this.generateOutputPath(video, config, outputFilename),
         format: config.format,
         quality: config.quality,
         codec: config.codec,
@@ -143,13 +144,26 @@ export class ConversionService {
    */
   private generateOutputPath(
     video: VideoFile,
-    config: OutputFileConfig
+    config: OutputFileConfig,
+    outputFilename?: string
   ): string {
     const inputPath = video.path;
-    const lastDotIndex = inputPath.lastIndexOf(".");
-    const basePath =
-      lastDotIndex > 0 ? inputPath.substring(0, lastDotIndex) : inputPath;
-    return `${basePath}_optimized.${config.format}`;
+    const lastSlashIndex = Math.max(
+      inputPath.lastIndexOf("/"),
+      inputPath.lastIndexOf("\\")
+    );
+    const directory =
+      lastSlashIndex > 0 ? inputPath.substring(0, lastSlashIndex) : ".";
+
+    // Utiliser le nom de fichier fourni ou générer un nom par défaut
+    if (outputFilename) {
+      return `${directory}/${outputFilename}`;
+    } else {
+      const lastDotIndex = inputPath.lastIndexOf(".");
+      const baseName =
+        lastDotIndex > 0 ? inputPath.substring(0, lastDotIndex) : inputPath;
+      return `${baseName}_optimized.${config.format}`;
+    }
   }
 
   /**

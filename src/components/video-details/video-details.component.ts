@@ -374,11 +374,16 @@ export class VideoDetailsComponent {
     const selectedAudioTracks = Array.from(this.selectedAudioTracks);
     const selectedSubtitleTracks = Array.from(this.selectedSubtitleTracks);
 
+    // Récupérer le nom de fichier généré
+    const generatedFilename = this.generatedFilename();
+    const outputFilename = generatedFilename?.filename;
+
     await this.conversionService.startConversion(
       video,
       this.outputConfig(),
       selectedAudioTracks,
-      selectedSubtitleTracks
+      selectedSubtitleTracks,
+      outputFilename
     );
   }
 

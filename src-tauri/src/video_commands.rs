@@ -299,19 +299,7 @@ fn get_subtitle_stream_indices(input_path: &str) -> Result<Vec<u32>, String> {
     Ok(indices)
 }
 
-// Fonction pour parser les chaînes de temps de FFmpeg (format: HH:MM:SS.mm)
-fn parse_time_string(time_str: &str) -> Result<f64, String> {
-    let parts: Vec<&str> = time_str.split(':').collect();
-    if parts.len() != 3 {
-        return Err("Format de temps invalide".to_string());
-    }
-    
-    let hours: f64 = parts[0].parse().map_err(|_| "Heures invalides".to_string())?;
-    let minutes: f64 = parts[1].parse().map_err(|_| "Minutes invalides".to_string())?;
-    let seconds: f64 = parts[2].parse().map_err(|_| "Secondes invalides".to_string())?;
-    
-    Ok(hours * 3600.0 + minutes * 60.0 + seconds)
-}
+
 
 
 
