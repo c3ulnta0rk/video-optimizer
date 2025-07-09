@@ -299,6 +299,22 @@ fn get_subtitle_stream_indices(input_path: &str) -> Result<Vec<u32>, String> {
     Ok(indices)
 }
 
+// Fonction pour parser les chaînes de temps de FFmpeg (format: HH:MM:SS.mm)
+fn parse_time_string(time_str: &str) -> Result<f64, String> {
+    let parts: Vec<&str> = time_str.split(':').collect();
+    if parts.len() != 3 {
+        return Err("Format de temps invalide".to_string());
+    }
+    
+    let hours: f64 = parts[0].parse().map_err(|_| "Heures invalides".to_string())?;
+    let minutes: f64 = parts[1].parse().map_err(|_| "Minutes invalides".to_string())?;
+    let seconds: f64 = parts[2].parse().map_err(|_| "Secondes invalides".to_string())?;
+    
+    Ok(hours * 3600.0 + minutes * 60.0 + seconds)
+}
+
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FfmpegFormat {
     pub name: String,
@@ -451,17 +467,17 @@ pub async fn start_video_conversion(
     // Ajouter la piste vidéo principale
     cmd.args(&["-map", "0:v:0"]);
     
-    // Sélection des pistes audio (utiliser les vrais indices)
+    // Sélection des pistes audio (utiliser les indices relatifs)
     for &selected_index in &config.selected_audio_tracks {
-        if let Some(&real_index) = audio_indices.get(selected_index as usize) {
-            cmd.args(&["-map", &format!("0:a:{}", real_index)]);
+        if selected_index < audio_indices.len() as u32 {
+            cmd.args(&["-map", &format!("0:a:{}", selected_index)]);
         }
     }
     
-    // Sélection des pistes de sous-titres (utiliser les vrais indices)
+    // Sélection des pistes de sous-titres (utiliser les indices relatifs)
     for &selected_index in &config.selected_subtitle_tracks {
-        if let Some(&real_index) = subtitle_indices.get(selected_index as usize) {
-            cmd.args(&["-map", &format!("0:s:{}", real_index)]);
+        if selected_index < subtitle_indices.len() as u32 {
+            cmd.args(&["-map", &format!("0:s:{}", selected_index)]);
         }
     }
     
@@ -499,6 +515,7 @@ pub async fn start_video_conversion(
         "-c:a", audio_codec,
         "-b:a", "128k",
         "-vf", &format!("scale={}", resolution),
+        "-c:s", "copy", // Copier les sous-titres sans conversion (évite les problèmes de conversion)
         "-progress", "pipe:1",
         "-y", // Écraser le fichier de sortie
         &config.output_path,
@@ -507,56 +524,59 @@ pub async fn start_video_conversion(
     // Log de la commande pour debug
     println!("Commande FFmpeg: {:?}", cmd);
     
-    // Démarrer le processus
+    // Obtenir la durée totale du fichier (en secondes)
+    let total_time = {
+        let meta = get_ffprobe_metadata(Path::new(&config.input_path))?;
+        meta.duration.unwrap_or(0.0)
+    };
+
     let mut child = cmd
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Erreur lors du démarrage de FFmpeg: {}", e))?;
-    
+
     let stdout = child.stdout.take().ok_or("Impossible de capturer la sortie")?;
     let stderr = child.stderr.take().ok_or("Impossible de capturer les erreurs")?;
-    let reader = BufReader::new(stdout);
+    let stdout_reader = BufReader::new(stdout);
     let stderr_reader = BufReader::new(stderr);
-    
-    let mut total_time = 0.0;
+
     let mut current_time = 0.0;
-    
-    // Lire la sortie en temps réel
-    for line in reader.lines() {
+    let mut error_output = String::new();
+
+    // Lire la progression sur stdout
+    for line in stdout_reader.lines() {
         let line = line.map_err(|e| format!("Erreur de lecture: {}", e))?;
-        
         if line.starts_with("out_time_ms=") {
             if let Some(time_str) = line.split('=').nth(1) {
                 if let Ok(time_ms) = time_str.parse::<u64>() {
-                    current_time = time_ms as f64 / 1000000.0; // Convertir en secondes
-                }
-            }
-        } else if line.starts_with("duration=") {
-            if let Some(duration_str) = line.split('=').nth(1) {
-                if let Ok(duration) = duration_str.parse::<f64>() {
-                    total_time = duration;
+                    current_time = time_ms as f64 / 1_000_000.0;
                 }
             }
         }
-        
         // Calculer la progression
         if total_time > 0.0 {
             let progress = (current_time / total_time).min(1.0);
             let elapsed = start_time.elapsed().as_secs_f64();
             let eta = if progress > 0.0 { elapsed / progress - elapsed } else { 0.0 };
-            
+
             let progress_data = ConversionProgress {
                 progress,
                 current_time,
                 total_time,
-                speed: 0.0, // FFmpeg ne fournit pas directement cette info
+                speed: 0.0,
                 eta,
                 status: format!("Conversion en cours... {:.1}%", progress * 100.0),
             };
-            
-            // Envoyer la progression à la fenêtre
             window.emit("conversion_progress", progress_data).ok();
+        }
+    }
+
+    // Lire les erreurs de stderr (pour le log)
+    for line in stderr_reader.lines() {
+        if let Ok(line) = line {
+            error_output.push_str(&line);
+            error_output.push('\n');
         }
     }
     
@@ -564,15 +584,6 @@ pub async fn start_video_conversion(
     let status = child.wait().map_err(|e| format!("Erreur lors de l'attente: {}", e))?;
     
     let duration = start_time.elapsed().as_secs_f64();
-    
-    // Lire les erreurs de stderr
-    let mut error_output = String::new();
-    for line in stderr_reader.lines() {
-        if let Ok(line) = line {
-            error_output.push_str(&line);
-            error_output.push('\n');
-        }
-    }
     
     if status.success() {
         Ok(ConversionResult {
