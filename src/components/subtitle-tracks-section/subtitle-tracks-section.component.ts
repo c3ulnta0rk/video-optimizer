@@ -20,9 +20,9 @@ import { SubtitleTrack } from "../../services/files-manager.service";
   styleUrls: ["./subtitle-tracks-section.component.scss"],
 })
 export class SubtitleTracksSectionComponent {
-  subtitleTracks = input<SubtitleTrack[]>([]);
-  selectedTracks = input<Set<number>>(new Set());
-  tracksChanged = output<Set<number>>();
+  public readonly subtitleTracks = input<SubtitleTrack[]>([]);
+  public readonly selectedTracks = input<Set<number>>(new Set());
+  public readonly tracksChanged = output<Set<number>>();
 
   public subtitleSectionExpanded = signal(false);
 

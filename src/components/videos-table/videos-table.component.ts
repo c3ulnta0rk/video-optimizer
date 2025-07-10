@@ -52,6 +52,7 @@ export class VideosTableComponent {
   public readonly videoRemoved = output<string>();
   private readonly dialog = inject(MatDialog);
   private readonly conversionService = inject(ConversionService);
+  private readonly filesManager = inject(FilesManagerService);
 
   public readonly displayedColumns = signal<string[]>([
     "name",
@@ -65,7 +66,7 @@ export class VideosTableComponent {
   // Sélection pour la conversion
   private selectedForConversion = new Set<string>();
 
-  constructor(private filesManager: FilesManagerService) {
+  constructor() {
     // Sélectionner toutes les vidéos par défaut pour la conversion
     effect(() => {
       const files = this.videoFiles();

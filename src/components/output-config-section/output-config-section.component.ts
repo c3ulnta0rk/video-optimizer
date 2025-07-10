@@ -27,12 +27,12 @@ import {
   styleUrls: ["./output-config-section.component.scss"],
 })
 export class OutputConfigSectionComponent {
-  outputConfig = input.required<OutputFileConfig>();
-  generatedFilename = input<GeneratedFilename | null>(null);
-  currentOutputPath = input<string>("");
-  configChanged = output<Partial<OutputFileConfig>>();
-  filenameChanged = output<string>();
-  selectOutputPath = output<void>();
+  public readonly outputConfig = input.required<OutputFileConfig>();
+  public readonly generatedFilename = input<GeneratedFilename | null>(null);
+  public readonly currentOutputPath = input<string>("");
+  public readonly configChanged = output<Partial<OutputFileConfig>>();
+  public readonly filenameChanged = output<string>();
+  public readonly selectOutputPath = output<void>();
 
   onConfigChange(newConfig: Partial<OutputFileConfig>): void {
     this.configChanged.emit(newConfig);

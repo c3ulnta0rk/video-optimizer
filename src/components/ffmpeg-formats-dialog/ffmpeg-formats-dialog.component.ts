@@ -1,4 +1,4 @@
-import { Component, inject } from "@angular/core";
+import { Component, computed, inject, signal } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
 import {
@@ -47,13 +47,9 @@ export class FfmpegFormatsDialogComponent {
   );
   private readonly data = inject(MAT_DIALOG_DATA, { optional: true });
 
-  public readonly ffmpegInfo = this.ffmpegService.ffmpegInfo;
-  public searchQuery = "";
-  public selectedTab = 0;
-
-  constructor() {
-    // Si des données sont passées, on peut les utiliser pour pré-sélectionner un format
-  }
+  public readonly ffmpegInfo = computed(() => this.ffmpegService.ffmpegInfo());
+  public readonly searchQuery = signal("");
+  public readonly selectedTab = signal(0);
 
   /**
    * Ferme le dialogue
@@ -80,10 +76,10 @@ export class FfmpegFormatsDialogComponent {
    * Filtre les formats selon la recherche
    */
   public getFilteredFormats(): FfmpegFormat[] {
-    if (!this.searchQuery.trim()) {
+    if (!this.searchQuery().trim()) {
       return this.ffmpegInfo().formats;
     }
-    return this.ffmpegService.searchFormats(this.searchQuery);
+    return this.ffmpegService.searchFormats(this.searchQuery());
   }
 
   /**

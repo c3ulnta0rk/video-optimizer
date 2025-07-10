@@ -1,4 +1,10 @@
-import { Component, inject, OnInit, ViewEncapsulation } from "@angular/core";
+import {
+  Component,
+  computed,
+  inject,
+  OnInit,
+  ViewEncapsulation,
+} from "@angular/core";
 
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { MatToolbarModule } from "@angular/material/toolbar";
@@ -35,7 +41,9 @@ export class AppComponent implements OnInit {
   private readonly filesManager = inject(FilesManagerService);
   private readonly settingsService = inject(SettingsService);
   private readonly dialog = inject(MatDialog);
-  public readonly selectedVideo = this.filesManager.selectedVideo;
+  public readonly selectedVideo = computed(
+    () => this.filesManager.selectedVideo
+  );
 
   ngOnInit(): void {
     // Détection initiale

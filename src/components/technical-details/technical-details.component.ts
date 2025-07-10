@@ -10,7 +10,7 @@ import { VideoFile } from "../../services/files-manager.service";
   styleUrls: ["./technical-details.component.scss"],
 })
 export class TechnicalDetailsComponent {
-  video = input.required<VideoFile>();
+  public readonly video = input.required<VideoFile>();
 
   formatFileSize(bytes: number): string {
     if (bytes === 0) return "0 B";

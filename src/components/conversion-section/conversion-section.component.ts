@@ -13,11 +13,11 @@ import { ConversionService } from "../../services/conversion.service";
   styleUrls: ["./conversion-section.component.scss"],
 })
 export class ConversionSectionComponent {
-  isConverting = input<boolean>(false);
-  hasSelectedVideo = input<boolean>(false);
-  conversionState = input<any>({});
-  startConversion = output<void>();
-  stopConversion = output<void>();
+  public readonly isConverting = input<boolean>(false);
+  public readonly hasSelectedVideo = input<boolean>(false);
+  public readonly conversionState = input<any>({});
+  public readonly startConversion = output<void>();
+  public readonly stopConversion = output<void>();
 
   formatTime(seconds: number): string {
     const hours = Math.floor(seconds / 3600);

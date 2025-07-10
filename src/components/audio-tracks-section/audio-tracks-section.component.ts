@@ -20,9 +20,9 @@ import { AudioTrack } from "../../services/files-manager.service";
   styleUrls: ["./audio-tracks-section.component.scss"],
 })
 export class AudioTracksSectionComponent {
-  audioTracks = input<AudioTrack[]>([]);
-  selectedTracks = input<Set<number>>(new Set());
-  tracksChanged = output<Set<number>>();
+  public readonly audioTracks = input<AudioTrack[]>([]);
+  public readonly selectedTracks = input<Set<number>>(new Set());
+  public readonly tracksChanged = output<Set<number>>();
 
   public audioSectionExpanded = signal(false);
 

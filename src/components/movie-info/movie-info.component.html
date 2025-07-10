@@ -1,9 +1,12 @@
-@if (movieInfo) {
+@if (movieInfo()) {
 <div class="movie-info-container">
   <!-- Poster du film -->
   <div class="movie-poster" (click)="onOpenAlternatives($event)">
-    <img [src]="getPosterUrl(movieInfo.posterPath)" [alt]="movieInfo.title" />
-    @if (showAlternativesButton) {
+    <img
+      [src]="getPosterUrl(movieInfo()!.posterPath)"
+      [alt]="movieInfo()!.title"
+    />
+    @if (showAlternativesButton()) {
     <div class="poster-overlay">
       <mat-icon>edit</mat-icon>
       <span>Changer</span>
@@ -16,62 +19,65 @@
     <!-- En-tête avec titre, année et type -->
     <div class="movie-header">
       <div class="title-section">
-        <h3 class="movie-title">{{ movieInfo.title }}</h3>
-        @if (movieInfo.year) {
-        <span class="movie-year">({{ movieInfo.year }})</span>
+        <h3 class="movie-title">{{ movieInfo()!.title }}</h3>
+        @if (movieInfo()!.year) {
+        <span class="movie-year">({{ movieInfo()!.year }})</span>
         }
       </div>
       <mat-chip>
-        <mat-icon>{{ movieInfo.type === "tv" ? "tv" : "movie" }}</mat-icon>
+        <mat-icon>{{ movieInfo()!.type === "tv" ? "tv" : "movie" }}</mat-icon>
       </mat-chip>
     </div>
 
     <!-- Note et popularité -->
-    @if (movieInfo.voteAverage !== undefined) {
+    @if (movieInfo()!.voteAverage !== undefined) {
     <div class="rating-section">
       <div class="rating">
         <mat-icon class="star-icon">star</mat-icon>
         <span class="rating-value">{{
-          (movieInfo.voteAverage || 0).toFixed(1)
+          (movieInfo()!.voteAverage || 0).toFixed(1)
         }}</span>
-        @if (movieInfo.voteCount !== undefined) {
+        @if (movieInfo()!.voteCount !== undefined) {
         <span class="rating-count"
-          >({{ (movieInfo.voteCount || 0).toLocaleString() }} votes)</span
+          >({{ (movieInfo()!.voteCount || 0).toLocaleString() }} votes)</span
         >
         }
       </div>
-      @if (movieInfo.popularity !== undefined) {
+      @if (movieInfo()!.popularity !== undefined) {
       <div class="popularity">
         <mat-icon>trending_up</mat-icon>
-        <span>{{ (movieInfo.popularity || 0).toFixed(0) }}</span>
+        <span>{{ (movieInfo()!.popularity || 0).toFixed(0) }}</span>
       </div>
       }
     </div>
     }
 
     <!-- Résumé -->
-    @if (movieInfo.overview) {
+    @if (movieInfo()!.overview) {
     <div class="overview-section">
       <p class="movie-overview">
-        {{ movieInfo.overview || "" | slice : 0 : 250
-        }}{{ (movieInfo.overview || "").length > 250 ? "..." : "" }}
+        {{ movieInfo()!.overview || "" | slice : 0 : 250
+        }}{{ (movieInfo()!.overview || "").length > 250 ? "..." : "" }}
       </p>
     </div>
     }
 
     <!-- Métadonnées -->
     <div class="metadata-section">
-      @if (movieInfo.releaseDate) {
+      @if (movieInfo()!.releaseDate) {
       <div class="meta-item">
         <mat-icon>calendar_today</mat-icon>
-        <span>{{ formatDate(movieInfo.releaseDate) }}</span>
+        <span>{{ formatDate(movieInfo()!.releaseDate) }}</span>
       </div>
       }
-      <div class="meta-item" [class]="getConfidenceColor(movieInfo.confidence)">
+      <div
+        class="meta-item"
+        [class]="getConfidenceColor(movieInfo()!.confidence)"
+      >
         <mat-icon>psychology</mat-icon>
         <span
           >Confiance:
-          {{ ((movieInfo.confidence || 0) * 100).toFixed(0) }}%</span
+          {{ ((movieInfo()!.confidence || 0) * 100).toFixed(0) }}%</span
         >
       </div>
     </div>

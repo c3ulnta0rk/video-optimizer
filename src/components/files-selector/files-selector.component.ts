@@ -1,4 +1,4 @@
-import { Component, signal } from "@angular/core";
+import { Component, computed, inject } from "@angular/core";
 import { MatIconModule } from "@angular/material/icon";
 import { MatButtonModule } from "@angular/material/button";
 import { MatSlideToggleModule } from "@angular/material/slide-toggle";
@@ -17,9 +17,8 @@ import { FilesManagerService } from "../../services/files-manager.service";
   styleUrl: "./files-selector.component.scss",
 })
 export class FilesSelectorComponent {
-  public readonly directory = this.filesManager.directory;
-
-  constructor(private filesManager: FilesManagerService) {}
+  private readonly filesManager = inject(FilesManagerService);
+  public readonly directory = computed(() => this.filesManager.directory);
 
   async onAddFiles() {
     await this.filesManager.selectFiles();

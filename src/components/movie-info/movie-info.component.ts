@@ -1,4 +1,4 @@
-import { Component, Input, inject, output } from "@angular/core";
+import { Component, Input, inject, input, output } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
 import { MatChipsModule } from "@angular/material/chips";
@@ -20,8 +20,8 @@ import { MovieInfo } from "../../services/movie-title-parser.service";
   styleUrls: ["./movie-info.component.scss"],
 })
 export class MovieInfoComponent {
-  @Input() movieInfo: MovieInfo | undefined;
-  @Input() showAlternativesButton: boolean = false;
+  public readonly movieInfo = input<MovieInfo | undefined>();
+  public readonly showAlternativesButton = input<boolean>(false);
 
   public readonly openAlternatives = output<void>();
 

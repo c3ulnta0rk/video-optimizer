@@ -63,7 +63,7 @@ import { DirectorySelectorService } from "../../services/directory-selector.serv
   styleUrls: ["./video-details.component.scss"],
 })
 export class VideoDetailsComponent {
-  selectedVideo = input.required<VideoFile>();
+  public readonly selectedVideo = input.required<VideoFile>();
 
   public readonly closeDetails = output<void>();
 
