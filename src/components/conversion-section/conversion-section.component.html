@@ -79,6 +79,25 @@
         <h6>Conversion Successful!</h6>
         <p>File created: {{ conversionState().result.output_path }}</p>
         <p>Duration: {{ formatTime(conversionState().result.duration) }}</p>
+        <div class="result-actions">
+          <button
+            mat-stroked-button
+            color="primary"
+            (click)="openOutputFile()"
+            class="open-file-button"
+          >
+            <mat-icon>play_circle</mat-icon>
+            Open File
+          </button>
+          <button
+            mat-stroked-button
+            (click)="openFileLocation()"
+            class="open-location-button"
+          >
+            <mat-icon>folder_open</mat-icon>
+            Open Location
+          </button>
+        </div>
       </div>
     </div>
     } @else {

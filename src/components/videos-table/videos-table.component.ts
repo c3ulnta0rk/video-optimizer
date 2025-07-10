@@ -25,7 +25,9 @@ import {
 import {
   ConversionService,
   ConversionQueueItem,
+  MovieMetadata,
 } from "../../services/conversion.service";
+import { FileOpenerService } from "../../services/file-opener.service";
 import { MovieAlternativesDialogComponent } from "../movie-alternatives-dialog/movie-alternatives-dialog.component";
 import { VideoDetailsDialogComponent } from "../video-details-dialog/video-details-dialog.component";
 
@@ -53,6 +55,7 @@ export class VideosTableComponent {
   private readonly dialog = inject(MatDialog);
   private readonly conversionService = inject(ConversionService);
   private readonly filesManager = inject(FilesManagerService);
+  private readonly fileOpener = inject(FileOpenerService);
 
   public readonly displayedColumns = signal<string[]>([
     "name",
@@ -241,13 +244,31 @@ export class VideosTableComponent {
     for (const videoPath of selectedPaths) {
       const video = this.videoFiles().find((v) => v.path === videoPath);
       if (video) {
+        // Préparer les métadonnées du film si disponibles
+        let movieMetadata: MovieMetadata | undefined;
+        if (video.movieInfo) {
+          movieMetadata = {
+            title: video.movieInfo.title,
+            year: video.movieInfo.releaseDate
+              ? new Date(video.movieInfo.releaseDate).getFullYear()
+              : video.movieInfo.year,
+            overview: video.movieInfo.overview,
+            director: undefined, // Non disponible dans MovieInfo
+            cast: [], // Non disponible dans MovieInfo
+            genre: video.movieInfo.genres || [],
+            rating: video.movieInfo.voteAverage,
+            poster_path: video.movieInfo.posterPath,
+          };
+        }
+
         this.conversionService.addToQueue(
           video,
           config,
           [], // selectedAudioTracks - à récupérer depuis les détails
           [], // selectedSubtitleTracks - à récupérer depuis les détails
           undefined, // outputFilename
-          null // customOutputPath
+          null, // customOutputPath
+          movieMetadata
         );
       }
     }
@@ -260,5 +281,16 @@ export class VideosTableComponent {
     // En cas d'erreur de chargement de l'image, on cache l'image
     const img = event.target as HTMLImageElement;
     img.style.display = "none";
+  }
+
+  async openConvertedFile(videoPath: string): Promise<void> {
+    const queueItem = this.conversionService.getQueueItem(videoPath);
+    if (queueItem?.result?.success && queueItem.result.output_path) {
+      try {
+        await this.fileOpener.openFile(queueItem.result.output_path);
+      } catch (error) {
+        console.error("Erreur lors de l'ouverture du fichier:", error);
+      }
+    }
   }
 }

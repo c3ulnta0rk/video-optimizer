@@ -505,6 +505,44 @@ pub async fn start_video_conversion(
         "-b:a", "128k",
         "-vf", &format!("scale={}", resolution),
         "-c:s", "copy", // Copier les sous-titres sans conversion (évite les problèmes de conversion)
+    ]);
+
+    // Ajouter les métadonnées si disponibles
+    if let Some(metadata) = &config.movie_metadata {
+        // Métadonnées de base
+        cmd.args(&["-metadata", &format!("title={}", metadata.title)]);
+        
+        if let Some(year) = metadata.year {
+            cmd.args(&["-metadata", &format!("date={}", year)]);
+        }
+        
+        if let Some(overview) = &metadata.overview {
+            cmd.args(&["-metadata", &format!("comment={}", overview)]);
+        }
+        
+        if let Some(director) = &metadata.director {
+            cmd.args(&["-metadata", &format!("director={}", director)]);
+        }
+        
+        if let Some(rating) = metadata.rating {
+            cmd.args(&["-metadata", &format!("rating={}", rating)]);
+        }
+        
+        // Ajouter le casting
+        if !metadata.cast.is_empty() {
+            let cast_string = metadata.cast.join(", ");
+            cmd.args(&["-metadata", &format!("artist={}", cast_string)]);
+        }
+        
+        // Ajouter les genres
+        if !metadata.genre.is_empty() {
+            let genre_string = metadata.genre.join(", ");
+            cmd.args(&["-metadata", &format!("genre={}", genre_string)]);
+        }
+    }
+
+    // Arguments finaux
+    cmd.args(&[
         "-progress", "pipe:1",
         "-y", // Écraser le fichier de sortie
         &config.output_path,
@@ -598,6 +636,18 @@ pub async fn start_video_conversion(
 } 
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct MovieMetadata {
+    pub title: String,
+    pub year: Option<u32>,
+    pub overview: Option<String>,
+    pub director: Option<String>,
+    pub cast: Vec<String>,
+    pub genre: Vec<String>,
+    pub rating: Option<f32>,
+    pub poster_path: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ConversionConfig {
     pub input_path: String,
     pub output_path: String,
@@ -608,6 +658,7 @@ pub struct ConversionConfig {
     pub crf: u32,
     pub selected_audio_tracks: Vec<u32>,
     pub selected_subtitle_tracks: Vec<u32>,
+    pub movie_metadata: Option<MovieMetadata>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -626,4 +677,79 @@ pub struct ConversionResult {
     pub output_path: Option<String>,
     pub error: Option<String>,
     pub duration: f64, // en secondes
+}
+
+#[command]
+pub async fn open_file(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("cmd")
+            .args(&["/C", "start", "", &path])
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {}", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open file: {}", e))?;
+    }
+
+    Ok(())
+}
+
+#[command]
+pub async fn open_folder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Essayer d'abord avec xdg-open, puis avec des alternatives spécifiques
+        let result = Command::new("xdg-open")
+            .arg(&path)
+            .spawn();
+        
+        if result.is_err() {
+            // Essayer avec nautilus (GNOME)
+            let _ = Command::new("nautilus")
+                .arg(&path)
+                .spawn();
+            
+            // Essayer avec dolphin (KDE)
+            let _ = Command::new("dolphin")
+                .arg(&path)
+                .spawn();
+            
+            // Essayer avec thunar (Xfce)
+            let _ = Command::new("thunar")
+                .arg(&path)
+                .spawn();
+        }
+    }
+
+    Ok(())
 } 

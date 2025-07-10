@@ -34,7 +34,10 @@ import {
   GeneratedFilename,
   AudioTrack,
 } from "../../services/filename-generator.service";
-import { ConversionService } from "../../services/conversion.service";
+import {
+  ConversionService,
+  MovieMetadata,
+} from "../../services/conversion.service";
 import { DirectorySelectorService } from "../../services/directory-selector.service";
 
 @Component({
@@ -380,13 +383,31 @@ export class VideoDetailsComponent {
     const outputFilename = generatedFilename?.filename;
     const customPath = this.customOutputPath();
 
+    // Préparer les métadonnées du film si disponibles
+    let movieMetadata: MovieMetadata | undefined;
+    if (video.movieInfo) {
+      movieMetadata = {
+        title: video.movieInfo.title,
+        year: video.movieInfo.releaseDate
+          ? new Date(video.movieInfo.releaseDate).getFullYear()
+          : video.movieInfo.year,
+        overview: video.movieInfo.overview,
+        director: undefined, // Non disponible dans MovieInfo
+        cast: [], // Non disponible dans MovieInfo
+        genre: video.movieInfo.genres || [],
+        rating: video.movieInfo.voteAverage,
+        poster_path: video.movieInfo.posterPath,
+      };
+    }
+
     await this.conversionService.startConversion(
       video,
       this.outputConfig(),
       selectedAudioTracks,
       selectedSubtitleTracks,
       outputFilename,
-      customPath
+      customPath,
+      movieMetadata
     );
   }
 

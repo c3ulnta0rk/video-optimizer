@@ -136,6 +136,15 @@
               <div class="conversion-completed">
                 <mat-icon color="success">check_circle</mat-icon>
                 <span>Completed</span>
+                <button
+                  mat-icon-button
+                  color="primary"
+                  matTooltip="Open converted file"
+                  (click)="openConvertedFile(video.path)"
+                  class="open-file-btn"
+                >
+                  <mat-icon>play_circle</mat-icon>
+                </button>
               </div>
               } @else if (getConversionStatus(video.path) === 'error') {
               <div class="conversion-error">

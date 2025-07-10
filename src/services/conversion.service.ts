@@ -5,6 +5,17 @@ import { VideoFile, AudioTrack, SubtitleTrack } from "./files-manager.service";
 import { OutputFileConfig } from "./filename-generator.service";
 import { SettingsService } from "./settings.service";
 
+export interface MovieMetadata {
+  title: string;
+  year?: number;
+  overview?: string;
+  director?: string;
+  cast: string[];
+  genre: string[];
+  rating?: number;
+  poster_path?: string;
+}
+
 export interface ConversionConfig {
   input_path: string;
   output_path: string;
@@ -15,6 +26,7 @@ export interface ConversionConfig {
   crf: number;
   selected_audio_tracks: number[];
   selected_subtitle_tracks: number[];
+  movie_metadata?: MovieMetadata;
 }
 
 export interface ConversionProgress {
@@ -40,6 +52,7 @@ export interface ConversionQueueItem {
   selectedSubtitleTracks: number[];
   outputFilename?: string;
   customOutputPath?: string | null;
+  movieMetadata?: MovieMetadata;
   status: "pending" | "converting" | "completed" | "error" | "cancelled";
   progress: ConversionProgress | null;
   result: ConversionResult | null;
@@ -90,7 +103,8 @@ export class ConversionService {
     selectedAudioTracks: number[],
     selectedSubtitleTracks: number[],
     outputFilename?: string,
-    customOutputPath?: string | null
+    customOutputPath?: string | null,
+    movieMetadata?: MovieMetadata
   ): Promise<void> {
     try {
       // Mettre à jour l'état
@@ -118,6 +132,7 @@ export class ConversionService {
         crf: config.crf,
         selected_audio_tracks: selectedAudioTracks,
         selected_subtitle_tracks: selectedSubtitleTracks,
+        movie_metadata: movieMetadata,
       };
 
       // Démarrer la conversion
@@ -160,7 +175,8 @@ export class ConversionService {
     selectedAudioTracks: number[],
     selectedSubtitleTracks: number[],
     outputFilename?: string,
-    customOutputPath?: string | null
+    customOutputPath?: string | null,
+    movieMetadata?: MovieMetadata
   ): void {
     const queueItem: ConversionQueueItem = {
       video,
@@ -169,6 +185,7 @@ export class ConversionService {
       selectedSubtitleTracks,
       outputFilename,
       customOutputPath,
+      movieMetadata,
       status: "pending",
       progress: null,
       result: null,
@@ -212,7 +229,8 @@ export class ConversionService {
         queueItem.selectedAudioTracks,
         queueItem.selectedSubtitleTracks,
         queueItem.outputFilename,
-        queueItem.customOutputPath
+        queueItem.customOutputPath,
+        queueItem.movieMetadata
       );
 
       // Marquer comme terminé
@@ -259,7 +277,8 @@ export class ConversionService {
           item.selectedAudioTracks,
           item.selectedSubtitleTracks,
           item.outputFilename,
-          item.customOutputPath
+          item.customOutputPath,
+          item.movieMetadata
         );
 
         // Marquer comme terminé
