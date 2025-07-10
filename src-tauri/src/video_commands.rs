@@ -1,9 +1,13 @@
 use serde::{Deserialize, Serialize};
-use std::process::{Command, Stdio};
+use std::process::{Command, Stdio, Child};
 use std::path::Path;
 use std::io::{BufRead, BufReader};
+use std::sync::Mutex;
 use tauri::command;
 use tauri::Emitter;
+
+// Variable globale pour stocker le processus FFmpeg en cours
+static FFMPEG_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AudioTrack {
@@ -563,8 +567,16 @@ pub async fn start_video_conversion(
         .spawn()
         .map_err(|e| format!("Erreur lors du démarrage de FFmpeg: {}", e))?;
 
+    // Prendre stdout et stderr avant de stocker le processus
     let stdout = child.stdout.take().ok_or("Impossible de capturer la sortie")?;
     let stderr = child.stderr.take().ok_or("Impossible de capturer les erreurs")?;
+
+    // Stocker le processus dans la variable globale
+    {
+        let mut process_guard = FFMPEG_PROCESS.lock().unwrap();
+        *process_guard = Some(child);
+    }
+
     let stdout_reader = BufReader::new(stdout);
     let stderr_reader = BufReader::new(stderr);
 
@@ -595,7 +607,13 @@ pub async fn start_video_conversion(
                 eta,
                 status: format!("Conversion en cours... {:.1}%", progress * 100.0),
             };
-            window.emit("conversion_progress", progress_data).ok();
+            
+            // Émettre l'événement avec le chemin de la vidéo
+            let progress_event = serde_json::json!({
+                "video_path": config.input_path,
+                "progress": progress_data
+            });
+            window.emit("conversion_progress", progress_event).ok();
         }
     }
 
@@ -607,8 +625,15 @@ pub async fn start_video_conversion(
         }
     }
     
-    // Attendre la fin du processus
-    let status = child.wait().map_err(|e| format!("Erreur lors de l'attente: {}", e))?;
+    // Attendre la fin du processus en le récupérant de la variable globale
+    let status = {
+        let mut process_guard = FFMPEG_PROCESS.lock().unwrap();
+        if let Some(mut child) = process_guard.take() {
+            child.wait().map_err(|e| format!("Erreur lors de l'attente: {}", e))?
+        } else {
+            return Err("Processus FFmpeg non trouvé".to_string());
+        }
+    };
     
     let duration = start_time.elapsed().as_secs_f64();
     
@@ -633,7 +658,29 @@ pub async fn start_video_conversion(
             duration,
         })
     }
-} 
+}
+
+#[command]
+pub async fn stop_video_conversion() -> Result<bool, String> {
+    let mut process_guard = FFMPEG_PROCESS.lock().unwrap();
+    
+    if let Some(mut child) = process_guard.take() {
+        // Tenter d'arrêter le processus
+        match child.kill() {
+            Ok(_) => {
+                println!("Processus FFmpeg arrêté avec succès");
+                Ok(true)
+            },
+            Err(e) => {
+                println!("Erreur lors de l'arrêt du processus FFmpeg: {}", e);
+                Err(format!("Erreur lors de l'arrêt: {}", e))
+            }
+        }
+    } else {
+        println!("Aucun processus FFmpeg en cours");
+        Ok(false)
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MovieMetadata {

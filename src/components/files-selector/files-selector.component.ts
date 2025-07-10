@@ -18,7 +18,7 @@ import { FilesManagerService } from "../../services/files-manager.service";
 })
 export class FilesSelectorComponent {
   private readonly filesManager = inject(FilesManagerService);
-  public readonly directory = computed(() => this.filesManager.directory);
+  public readonly directory = computed(() => this.filesManager.directory());
 
   async onAddFiles() {
     await this.filesManager.selectFiles();

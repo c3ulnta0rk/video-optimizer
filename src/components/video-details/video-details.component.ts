@@ -6,6 +6,7 @@ import {
   signal,
   effect,
   input,
+  computed,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
@@ -77,6 +78,18 @@ export class VideoDetailsComponent {
   private readonly conversionService = inject(ConversionService);
   private readonly directorySelector = inject(DirectorySelectorService);
 
+  // Computed pour récupérer les données à jour du service
+  public readonly currentVideo = computed(() => {
+    const inputVideo = this.selectedVideo();
+    if (!inputVideo) return null;
+
+    // Récupérer les données à jour depuis le service
+    const allVideos = this.filesManager.videoFiles();
+    const updatedVideo = allVideos.find((v) => v.path === inputVideo.path);
+
+    return updatedVideo || inputVideo;
+  });
+
   public readonly outputConfig = signal<OutputFileConfig>({
     format: "mkv",
     quality: "1080p",
@@ -97,11 +110,11 @@ export class VideoDetailsComponent {
 
   // Getters pour s'assurer que les propriétés sont toujours initialisées
   get audioTracks() {
-    return this.selectedVideo()?.audio_tracks || [];
+    return this.currentVideo()?.audio_tracks || [];
   }
 
   get subtitleTracks() {
-    return this.selectedVideo()?.subtitle_tracks || [];
+    return this.currentVideo()?.subtitle_tracks || [];
   }
 
   // Getter pour l'état de conversion
@@ -115,7 +128,7 @@ export class VideoDetailsComponent {
 
     effect(() => {
       // Régénérer le nom de fichier quand la vidéo sélectionnée ou la config change
-      const video = this.selectedVideo();
+      const video = this.currentVideo();
       const config = this.outputConfig();
 
       if (video) {
@@ -187,10 +200,10 @@ export class VideoDetailsComponent {
   }
 
   onOpenMovieAlternatives(): void {
-    if (!this.selectedVideo) return;
+    if (!this.currentVideo()) return;
 
     const alternatives = this.filesManager.openMovieAlternativesDialog(
-      this.selectedVideo().path
+      this.currentVideo()!.path
     );
     if (alternatives) {
       const dialogRef = this.dialog.open(MovieAlternativesDialogComponent, {
@@ -205,7 +218,7 @@ export class VideoDetailsComponent {
       dialogRef.afterClosed().subscribe((selectedMovie) => {
         if (selectedMovie) {
           this.filesManager.updateMovieInfo(
-            this.selectedVideo().path,
+            this.currentVideo()!.path,
             selectedMovie
           );
         }
@@ -217,7 +230,7 @@ export class VideoDetailsComponent {
     this.selectedAudioTracks = tracks;
 
     // Régénérer le nom de fichier avec les nouvelles pistes audio
-    const video = this.selectedVideo();
+    const video = this.currentVideo();
     if (video && video.movieInfo) {
       const selectedTracks = this.getSelectedAudioTracks();
       const config = this.outputConfig();
@@ -270,7 +283,7 @@ export class VideoDetailsComponent {
     this.outputConfig.set(updatedConfig);
 
     // Régénérer le nom de fichier avec la nouvelle configuration
-    const video = this.selectedVideo();
+    const video = this.currentVideo();
     if (video && video.movieInfo) {
       const selectedTracks = this.getSelectedAudioTracks();
       const filename = this.filenameGenerator.generateOutputFilename(
@@ -321,7 +334,7 @@ export class VideoDetailsComponent {
   }
 
   getCurrentOutputPath(): string {
-    const video = this.selectedVideo();
+    const video = this.currentVideo();
     if (!video) return "";
 
     const customPath = this.customOutputPath();
@@ -372,7 +385,7 @@ export class VideoDetailsComponent {
 
   // Méthodes de conversion
   async startConversion(): Promise<void> {
-    const video = this.selectedVideo();
+    const video = this.currentVideo();
     if (!video) return;
 
     const selectedAudioTracks = Array.from(this.selectedAudioTracks);
@@ -413,5 +426,18 @@ export class VideoDetailsComponent {
 
   stopConversion(): void {
     this.conversionService.stopConversion();
+  }
+
+  onManualSearch(): void {
+    const video = this.currentVideo();
+    if (!video) return;
+
+    this.filesManager
+      .openManualSearchDialog(video.path)
+      .subscribe((selectedMovie) => {
+        if (selectedMovie) {
+          this.filesManager.updateMovieInfo(video.path, selectedMovie);
+        }
+      });
   }
 }

@@ -1,0 +1,154 @@
+<div class="manual-search-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>search</mat-icon>
+    Recherche manuelle TMDB
+  </h2>
+
+  <mat-dialog-content>
+    <!-- Informations sur le fichier original -->
+    <div class="original-file-info">
+      <p><strong>Fichier original:</strong> {{ originalFileName() }}</p>
+      <p><strong>Requête automatique:</strong> {{ originalQuery() }}</p>
+    </div>
+
+    <!-- Formulaire de recherche -->
+    <div class="search-form">
+      <mat-form-field appearance="outline" class="search-input">
+        <mat-label>Mots-clés de recherche</mat-label>
+        <input
+          matInput
+          [(ngModel)]="searchQuery"
+          placeholder="Ex: Le Seigneur des Anneaux"
+          (keyup.enter)="onSearch()"
+        />
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <div class="search-options">
+        <mat-form-field appearance="outline">
+          <mat-label>Type</mat-label>
+          <mat-select [(ngModel)]="searchType">
+            <mat-option value="movie">Film</mat-option>
+            <mat-option value="tv">Série TV</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Année (optionnel)</mat-label>
+          <input
+            matInput
+            type="number"
+            [(ngModel)]="searchYear"
+            placeholder="2023"
+            min="1900"
+            max="2030"
+          />
+        </mat-form-field>
+      </div>
+
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="onSearch()"
+        [disabled]="!searchQuery().trim() || isLoading()"
+      >
+        <mat-icon>search</mat-icon>
+        Rechercher
+      </button>
+    </div>
+
+    <!-- Suggestions de mots-clés -->
+    @if (getSuggestedKeywords().length > 0) {
+    <div class="suggestions-section">
+      <h3>Suggestions basées sur le nom de fichier:</h3>
+      <div class="suggestions-chips">
+        @for (suggestion of getSuggestedKeywords(); track suggestion) {
+        <mat-chip (click)="onUseSuggestion(suggestion)" class="suggestion-chip">
+          {{ suggestion }}
+        </mat-chip>
+        }
+      </div>
+    </div>
+    }
+
+    <!-- Indicateur de chargement -->
+    @if (isLoading()) {
+    <div class="loading-section">
+      <mat-progress-spinner
+        mode="indeterminate"
+        diameter="40"
+      ></mat-progress-spinner>
+      <p>Recherche en cours...</p>
+    </div>
+    }
+
+    <!-- Résultats de recherche -->
+    @if (searchResults() && !isLoading()) {
+    <div class="search-results">
+      <div class="results-header">
+        <h3>
+          Résultats pour: <strong>{{ searchResults()!.originalQuery }}</strong>
+        </h3>
+        <p>{{ searchResults()!.alternatives.length }} résultat(s) trouvé(s)</p>
+      </div>
+
+      @if (searchResults()!.alternatives.length > 0) {
+      <div class="results-grid">
+        @for (movie of searchResults()!.alternatives; track movie.tmdbId) {
+        <mat-card
+          class="movie-card"
+          [class.selected]="selectedMovie()?.tmdbId === movie.tmdbId"
+          (click)="onSelectMovie(movie)"
+        >
+          <div class="movie-poster">
+            <img [src]="getPosterUrl(movie.posterPath)" [alt]="movie.title" />
+            @if (selectedMovie()?.tmdbId === movie.tmdbId) {
+            <div class="selected-overlay">
+              <mat-icon>check_circle</mat-icon>
+            </div>
+            }
+          </div>
+
+          <mat-card-content>
+            <h3 class="movie-title">{{ movie.title }}</h3>
+            @if (movie.year) {
+            <p class="movie-year">{{ movie.year }}</p>
+            } @if (movie.voteAverage) {
+            <div class="movie-rating">
+              <mat-icon>star</mat-icon>
+              <span>{{ movie.voteAverage.toFixed(1) }}</span>
+            </div>
+            } @if (movie.overview) {
+            <p class="movie-overview">
+              {{ movie.overview | slice : 0 : 100
+              }}{{ movie.overview.length > 100 ? "..." : "" }}
+            </p>
+            }
+          </mat-card-content>
+        </mat-card>
+        }
+      </div>
+      } @else {
+      <div class="no-results">
+        <mat-icon>search_off</mat-icon>
+        <p>Aucun résultat trouvé pour cette recherche.</p>
+        <p>Essayez avec des mots-clés différents.</p>
+      </div>
+      }
+    </div>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="onCancel()">Annuler</button>
+    <button
+      mat-raised-button
+      (click)="onConfirm()"
+      color="primary"
+      [disabled]="!selectedMovie()"
+    >
+      <mat-icon>check</mat-icon>
+      Confirmer
+    </button>
+  </mat-dialog-actions>
+</div>

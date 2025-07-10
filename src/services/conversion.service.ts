@@ -61,10 +61,9 @@ export interface ConversionQueueItem {
 
 export interface ConversionState {
   isConverting: boolean;
-  progress: ConversionProgress | null;
-  currentVideo: VideoFile | null;
-  result: ConversionResult | null;
+  currentConvertingVideo: VideoFile | null;
   queue: ConversionQueueItem[];
+  isQueueProcessing: boolean; // Nouveau flag pour éviter les conflits
 }
 
 @Injectable({
@@ -73,10 +72,9 @@ export interface ConversionState {
 export class ConversionService {
   private readonly _conversionState = signal<ConversionState>({
     isConverting: false,
-    progress: null,
-    currentVideo: null,
-    result: null,
+    currentConvertingVideo: null,
     queue: [],
+    isQueueProcessing: false,
   });
 
   public readonly conversionState = this._conversionState.asReadonly();
@@ -86,12 +84,13 @@ export class ConversionService {
   }
 
   private async setupEventListeners(): Promise<void> {
-    await listen<ConversionProgress>("conversion_progress", (event) => {
-      this._conversionState.update((state: ConversionState) => ({
-        ...state,
-        progress: event.payload,
-      }));
-    });
+    await listen<{ video_path: string; progress: ConversionProgress }>(
+      "conversion_progress",
+      (event) => {
+        const { video_path, progress } = event.payload;
+        this.updateQueueItemProgress(video_path, progress);
+      }
+    );
   }
 
   /**
@@ -105,65 +104,38 @@ export class ConversionService {
     outputFilename?: string,
     customOutputPath?: string | null,
     movieMetadata?: MovieMetadata
-  ): Promise<void> {
-    try {
-      // Mettre à jour l'état
-      this._conversionState.set({
-        isConverting: true,
-        progress: null,
-        currentVideo: video,
-        result: null,
-        queue: this._conversionState().queue,
-      });
+  ): Promise<ConversionResult> {
+    // Préparer la configuration de conversion
+    const conversionConfig: ConversionConfig = {
+      input_path: video.path,
+      output_path: this.generateOutputPath(
+        video,
+        config,
+        outputFilename,
+        customOutputPath
+      ),
+      format: config.format,
+      quality: config.quality,
+      codec: config.codec,
+      audio_codec: config.audio,
+      crf: config.crf,
+      selected_audio_tracks: selectedAudioTracks,
+      selected_subtitle_tracks: selectedSubtitleTracks,
+      movie_metadata: movieMetadata,
+    };
 
-      // Préparer la configuration de conversion
-      const conversionConfig: ConversionConfig = {
-        input_path: video.path,
-        output_path: this.generateOutputPath(
-          video,
-          config,
-          outputFilename,
-          customOutputPath
-        ),
-        format: config.format,
-        quality: config.quality,
-        codec: config.codec,
-        audio_codec: config.audio,
-        crf: config.crf,
-        selected_audio_tracks: selectedAudioTracks,
-        selected_subtitle_tracks: selectedSubtitleTracks,
-        movie_metadata: movieMetadata,
-      };
+    // Démarrer la conversion
+    const result = await invoke<ConversionResult>("start_video_conversion", {
+      config: conversionConfig,
+    });
 
-      // Démarrer la conversion
-      const result = await invoke<ConversionResult>("start_video_conversion", {
-        config: conversionConfig,
-      });
-
-      // Mettre à jour l'état avec le résultat
-      this._conversionState.update((state: ConversionState) => ({
-        ...state,
-        isConverting: false,
-        result,
-      }));
-
-      if (result.success) {
-        console.log("Conversion réussie:", result.output_path);
-      } else {
-        console.error("Échec de la conversion:", result.error);
-      }
-    } catch (error) {
-      console.error("Erreur lors de la conversion:", error);
-      this._conversionState.update((state: ConversionState) => ({
-        ...state,
-        isConverting: false,
-        result: {
-          success: false,
-          error: error instanceof Error ? error.message : "Erreur inconnue",
-          duration: 0,
-        },
-      }));
+    if (result.success) {
+      console.log("Conversion réussie:", result.output_path);
+    } else {
+      console.error("Échec de la conversion:", result.error);
     }
+
+    return result;
   }
 
   /**
@@ -207,6 +179,13 @@ export class ConversionService {
     }));
   }
 
+  clearQueue(): void {
+    this._conversionState.update((state: ConversionState) => ({
+      ...state,
+      queue: [],
+    }));
+  }
+
   /**
    * Démarre la conversion d'une vidéo spécifique de la file d'attente
    */
@@ -221,9 +200,14 @@ export class ConversionService {
 
     // Marquer comme en cours de conversion
     this.updateQueueItemStatus(videoPath, "converting");
+    this._conversionState.update((state: ConversionState) => ({
+      ...state,
+      isConverting: true,
+      currentConvertingVideo: queueItem.video,
+    }));
 
     try {
-      await this.startConversion(
+      const result = await this.startConversion(
         queueItem.video,
         queueItem.config,
         queueItem.selectedAudioTracks,
@@ -232,6 +216,9 @@ export class ConversionService {
         queueItem.customOutputPath,
         queueItem.movieMetadata
       );
+
+      // Mettre à jour le résultat
+      this.updateQueueItemResult(videoPath, result);
 
       // Marquer comme terminé
       this.updateQueueItemStatus(videoPath, "completed");
@@ -242,16 +229,31 @@ export class ConversionService {
         "error",
         error instanceof Error ? error.message : "Erreur inconnue"
       );
+    } finally {
+      // Réinitialiser l'état global
+      this._conversionState.update((state: ConversionState) => ({
+        ...state,
+        isConverting: false,
+        currentConvertingVideo: null,
+      }));
     }
   }
 
   /**
-   * Démarre la conversion de toutes les vidéos sélectionnées
+   * Démarre la conversion séquentielle de toutes les vidéos sélectionnées
+   * Cette méthode assure que les conversions se font une par une
    */
-  async startAllSelectedConversions(
+  async startSequentialConversions(
     selectedVideoPaths: string[]
   ): Promise<void> {
     const state = this._conversionState();
+
+    // Vérifier si une conversion est déjà en cours
+    if (state.isQueueProcessing) {
+      console.log("Une conversion est déjà en cours, veuillez attendre");
+      return;
+    }
+
     const pendingItems = state.queue.filter(
       (item) =>
         selectedVideoPaths.includes(item.video.path) &&
@@ -263,34 +265,71 @@ export class ConversionService {
       return;
     }
 
-    console.log(`Démarrage de la conversion de ${pendingItems.length} vidéos`);
+    console.log(
+      `Démarrage de la conversion séquentielle de ${pendingItems.length} vidéos`
+    );
 
-    // Traiter les vidéos séquentiellement pour éviter la surcharge
-    for (const item of pendingItems) {
-      try {
-        // Marquer comme en cours de conversion
-        this.updateQueueItemStatus(item.video.path, "converting");
+    // Marquer que le traitement de la file d'attente a commencé
+    this._conversionState.update((state: ConversionState) => ({
+      ...state,
+      isQueueProcessing: true,
+    }));
 
-        await this.startConversion(
-          item.video,
-          item.config,
-          item.selectedAudioTracks,
-          item.selectedSubtitleTracks,
-          item.outputFilename,
-          item.customOutputPath,
-          item.movieMetadata
-        );
+    try {
+      // Traiter les vidéos une par une
+      for (const item of pendingItems) {
+        // Vérifier si on a été interrompu
+        if (!this._conversionState().isQueueProcessing) {
+          console.log("Traitement de la file d'attente interrompu");
+          break;
+        }
 
-        // Marquer comme terminé
-        this.updateQueueItemStatus(item.video.path, "completed");
-      } catch (error) {
-        // Marquer comme erreur
-        this.updateQueueItemStatus(
-          item.video.path,
-          "error",
-          error instanceof Error ? error.message : "Erreur inconnue"
-        );
+        try {
+          // Marquer comme en cours de conversion
+          this.updateQueueItemStatus(item.video.path, "converting");
+          this._conversionState.update((state: ConversionState) => ({
+            ...state,
+            isConverting: true,
+            currentConvertingVideo: item.video,
+          }));
+
+          const result = await this.startConversion(
+            item.video,
+            item.config,
+            item.selectedAudioTracks,
+            item.selectedSubtitleTracks,
+            item.outputFilename,
+            item.customOutputPath,
+            item.movieMetadata
+          );
+
+          // Mettre à jour le résultat
+          this.updateQueueItemResult(item.video.path, result);
+
+          // Marquer comme terminé
+          this.updateQueueItemStatus(item.video.path, "completed");
+        } catch (error) {
+          // Marquer comme erreur
+          this.updateQueueItemStatus(
+            item.video.path,
+            "error",
+            error instanceof Error ? error.message : "Erreur inconnue"
+          );
+        } finally {
+          // Réinitialiser l'état global
+          this._conversionState.update((state: ConversionState) => ({
+            ...state,
+            isConverting: false,
+            currentConvertingVideo: null,
+          }));
+        }
       }
+    } finally {
+      // Marquer que le traitement de la file d'attente est terminé
+      this._conversionState.update((state: ConversionState) => ({
+        ...state,
+        isQueueProcessing: false,
+      }));
     }
   }
 
@@ -326,6 +365,21 @@ export class ConversionService {
   }
 
   /**
+   * Met à jour le résultat d'un élément de la file d'attente
+   */
+  private updateQueueItemResult(
+    videoPath: string,
+    result: ConversionResult
+  ): void {
+    this._conversionState.update((state: ConversionState) => ({
+      ...state,
+      queue: state.queue.map((item) =>
+        item.video.path === videoPath ? { ...item, result } : item
+      ),
+    }));
+  }
+
+  /**
    * Obtient un élément de la file d'attente par chemin de vidéo
    */
   getQueueItem(videoPath: string): ConversionQueueItem | undefined {
@@ -337,12 +391,95 @@ export class ConversionService {
   /**
    * Arrête la conversion en cours
    */
-  stopConversion(): void {
-    // TODO: Implémenter l'arrêt de la conversion
+  async stopConversion(): Promise<boolean> {
+    try {
+      const result = await invoke<boolean>("stop_video_conversion");
+
+      if (result) {
+        // Marquer toutes les conversions en cours comme annulées
+        this._conversionState.update((state: ConversionState) => ({
+          ...state,
+          isConverting: false,
+          currentConvertingVideo: null,
+          isQueueProcessing: false, // Arrêter le traitement de la file d'attente
+          queue: state.queue.map((item) =>
+            item.status === "converting"
+              ? { ...item, status: "cancelled" as const, progress: null }
+              : item
+          ),
+        }));
+      }
+
+      return result;
+    } catch (error) {
+      console.error("Erreur lors de l'arrêt de la conversion:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Réinitialise l'état d'une vidéo annulée pour permettre de la relancer
+   */
+  resetCancelledVideo(videoPath: string): void {
     this._conversionState.update((state: ConversionState) => ({
       ...state,
-      isConverting: false,
+      queue: state.queue.map((item) =>
+        item.video.path === videoPath && item.status === "cancelled"
+          ? {
+              ...item,
+              status: "pending" as const,
+              progress: null,
+              result: null,
+              error: undefined,
+            }
+          : item
+      ),
     }));
+  }
+
+  async stopAllConversions(): Promise<boolean> {
+    try {
+      const result = await invoke<boolean>("stop_video_conversion");
+
+      // Arrêter complètement le traitement de la file d'attente
+      this._conversionState.update((state: ConversionState) => ({
+        ...state,
+        isConverting: false,
+        currentConvertingVideo: null,
+        isQueueProcessing: false,
+        queue: state.queue.map((item) =>
+          item.status === "converting"
+            ? { ...item, status: "cancelled" as const, progress: null }
+            : item
+        ),
+      }));
+
+      return result;
+    } catch (error) {
+      console.error("Erreur lors de l'arrêt des conversions:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Vérifie s'il y a une conversion en cours
+   */
+  isConverting(): boolean {
+    return this._conversionState().isConverting;
+  }
+
+  /**
+   * Vérifie si la file d'attente est en cours de traitement
+   */
+  isQueueProcessing(): boolean {
+    return this._conversionState().isQueueProcessing;
+  }
+
+  /**
+   * Obtient la vidéo actuellement en cours de conversion
+   */
+  getCurrentConvertingVideo(): VideoFile | null {
+    return this._conversionState().currentConvertingVideo;
   }
 
   /**

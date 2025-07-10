@@ -81,6 +81,25 @@
         >
       </div>
     </div>
+
+    <!-- Bouton de recherche manuelle si confiance faible -->
+    @if (movieInfo()!.confidence < 0.7) {
+    <div class="manual-search-section">
+      <button
+        mat-stroked-button
+        color="warn"
+        (click)="onManualSearch($event)"
+        class="manual-search-btn"
+      >
+        <mat-icon>search</mat-icon>
+        Recherche manuelle
+      </button>
+      <p class="manual-search-hint">
+        La recherche automatique n'a pas trouvé de correspondance exacte.
+        Utilisez la recherche manuelle pour améliorer les résultats.
+      </p>
+    </div>
+    }
   </div>
 </div>
 } @else {

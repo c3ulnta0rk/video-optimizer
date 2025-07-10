@@ -3,16 +3,31 @@
     <div class="header-content">
       <h3>Selected Video Files ({{ videoFiles().length }})</h3>
       <div class="header-actions">
+        @if (conversionService.isConverting()) {
+        <button
+          mat-raised-button
+          color="warn"
+          (click)="stopAllConversions()"
+          matTooltip="Stop all conversions"
+        >
+          <mat-icon>stop</mat-icon>
+          Stop Conversions
+        </button>
+        } @else {
         <button
           mat-raised-button
           color="primary"
-          [disabled]="getSelectedForConversionCount() === 0"
+          [disabled]="
+            getSelectedForConversionCount() === 0 ||
+            conversionService.isQueueProcessing()
+          "
           (click)="startAllSelectedConversions()"
           matTooltip="Start conversion for all selected videos"
         >
           <mat-icon>play_arrow</mat-icon>
           Convert All ({{ getSelectedForConversionCount() }})
         </button>
+        }
       </div>
     </div>
   </div>
@@ -33,7 +48,9 @@
               (error)="onPosterError($event)"
             />
             } @else {
-            <mat-icon class="file-icon">video_file</mat-icon>
+            <div class="movie-poster no-poster">
+              <mat-icon class="file-icon">video_file</mat-icon>
+            </div>
             }
             <span class="file-name">{{ video.name }}</span>
           </div>
@@ -112,7 +129,8 @@
               >
               </mat-checkbox>
               @if (getConversionStatus(video.path) === 'none' ||
-              getConversionStatus(video.path) === 'pending') {
+              getConversionStatus(video.path) === 'pending' ||
+              getConversionStatus(video.path) === 'cancelled') {
               <button
                 mat-icon-button
                 color="primary"
@@ -136,20 +154,16 @@
               <div class="conversion-completed">
                 <mat-icon color="success">check_circle</mat-icon>
                 <span>Completed</span>
-                <button
-                  mat-icon-button
-                  color="primary"
-                  matTooltip="Open converted file"
-                  (click)="openConvertedFile(video.path)"
-                  class="open-file-btn"
-                >
-                  <mat-icon>play_circle</mat-icon>
-                </button>
               </div>
               } @else if (getConversionStatus(video.path) === 'error') {
               <div class="conversion-error">
                 <mat-icon color="warn">error</mat-icon>
                 <span>Error</span>
+              </div>
+              } @else if (getConversionStatus(video.path) === 'cancelled') {
+              <div class="conversion-cancelled">
+                <mat-icon color="warn">cancel</mat-icon>
+                <span>Cancelled</span>
               </div>
               }
             </div>
@@ -179,6 +193,42 @@
               (click)="onOpenMovieAlternatives(video, $event)"
             >
               <mat-icon>movie</mat-icon>
+            </button>
+            } @if (video.movieInfo && video.movieInfo.confidence < 0.7) {
+            <button
+              mat-icon-button
+              color="warn"
+              matTooltip="Manual search"
+              (click)="onManualSearch(video, $event)"
+            >
+              <mat-icon>search</mat-icon>
+            </button>
+            } @if (getConversionStatus(video.path) === 'converting') {
+            <button
+              mat-icon-button
+              color="warn"
+              matTooltip="Stop conversion"
+              (click)="stopConversion($event)"
+            >
+              <mat-icon>stop</mat-icon>
+            </button>
+            } @if (getConversionStatus(video.path) === 'completed') {
+            <button
+              mat-icon-button
+              color="primary"
+              matTooltip="Open converted file"
+              (click)="openConvertedFile(video.path, $event)"
+            >
+              <mat-icon>play_circle</mat-icon>
+            </button>
+            } @if (getConversionStatus(video.path) === 'cancelled') {
+            <button
+              mat-icon-button
+              color="primary"
+              matTooltip="Restart conversion"
+              (click)="startConversion(video)"
+            >
+              <mat-icon>refresh</mat-icon>
             </button>
             }
             <button

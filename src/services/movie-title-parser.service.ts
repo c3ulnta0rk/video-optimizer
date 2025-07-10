@@ -385,4 +385,105 @@ export class MovieTitleParserService {
       })
     );
   }
+
+  /**
+   * Recherche manuelle avec des mots-clés personnalisés
+   */
+  public searchMovieWithCustomKeywords(
+    customQuery: string,
+    searchType: "movie" | "tv" = "movie",
+    year?: number
+  ): Observable<MovieSearchResult> {
+    const apiKey = this.settingsService.getTmdbApiKey();
+    if (!apiKey) {
+      return of({
+        selected: {
+          title: customQuery,
+          year,
+          type: searchType,
+          confidence: 0.6,
+        },
+        alternatives: [],
+        originalQuery: customQuery,
+      });
+    }
+
+    const searchUrl = `${this.TMDB_BASE_URL()}/search/${searchType}`;
+
+    const params: any = {
+      api_key: apiKey,
+      query: customQuery,
+      language: "fr-FR",
+      page: 1,
+      include_adult: false,
+    };
+
+    if (year) {
+      params.year = year;
+    }
+
+    return this.http.get<any>(searchUrl, { params }).pipe(
+      map((response) => {
+        if (response.results && response.results.length > 0) {
+          const alternatives = response.results
+            .slice(0, 10)
+            .map((result: any) => ({
+              title: result.title || result.name,
+              year:
+                year ||
+                this.extractYearFromDate(
+                  result.release_date || result.first_air_date
+                ),
+              type: searchType,
+              tmdbId: result.id,
+              posterPath: result.poster_path,
+              backdropPath: result.backdrop_path,
+              overview: result.overview,
+              voteAverage: result.vote_average,
+              voteCount: result.vote_count,
+              popularity: result.popularity,
+              releaseDate: result.release_date || result.first_air_date,
+              confidence: 0.8,
+            }));
+
+          // Sélectionner le plus populaire par défaut
+          const selected = alternatives.reduce(
+            (best: MovieInfo, current: MovieInfo) =>
+              (current.popularity || 0) > (best.popularity || 0)
+                ? current
+                : best
+          );
+
+          return {
+            selected,
+            alternatives,
+            originalQuery: customQuery,
+          };
+        }
+
+        return {
+          selected: {
+            title: customQuery,
+            year,
+            type: searchType,
+            confidence: 0.5,
+          },
+          alternatives: [],
+          originalQuery: customQuery,
+        };
+      }),
+      catchError(() => {
+        return of({
+          selected: {
+            title: customQuery,
+            year,
+            type: searchType,
+            confidence: 0.6,
+          },
+          alternatives: [],
+          originalQuery: customQuery,
+        });
+      })
+    );
+  }
 }

@@ -53,7 +53,7 @@ export class VideosTableComponent {
   public readonly videoSelected = output<VideoFile>();
   public readonly videoRemoved = output<string>();
   private readonly dialog = inject(MatDialog);
-  private readonly conversionService = inject(ConversionService);
+  public readonly conversionService = inject(ConversionService);
   private readonly filesManager = inject(FilesManagerService);
   private readonly fileOpener = inject(FileOpenerService);
 
@@ -137,6 +137,18 @@ export class VideosTableComponent {
     }
   }
 
+  public onManualSearch(video: VideoFile, event: Event): void {
+    event.stopPropagation(); // Empêche la sélection de la ligne
+
+    this.filesManager
+      .openManualSearchDialog(video.path)
+      .subscribe((selectedMovie) => {
+        if (selectedMovie) {
+          this.filesManager.updateMovieInfo(video.path, selectedMovie);
+        }
+      });
+  }
+
   public getPosterUrl(posterPath: string | undefined): string {
     if (!posterPath) return "assets/no-poster.png";
     return `https://image.tmdb.org/t/p/w200${posterPath}`;
@@ -187,6 +199,12 @@ export class VideosTableComponent {
   }
 
   async startConversion(video: VideoFile): Promise<void> {
+    // Vérifier si la vidéo était annulée et la réinitialiser
+    const queueItem = this.conversionService.getQueueItem(video.path);
+    if (queueItem?.status === "cancelled") {
+      this.conversionService.resetCancelledVideo(video.path);
+    }
+
     // Pour l'instant, on utilise une configuration par défaut
     // TODO: Récupérer la configuration depuis les détails de la vidéo
     const config = {
@@ -227,6 +245,12 @@ export class VideosTableComponent {
 
     if (selectedPaths.length === 0) {
       console.log("Aucune vidéo sélectionnée");
+      return;
+    }
+
+    // Vérifier si une conversion est déjà en cours
+    if (this.conversionService.isQueueProcessing()) {
+      console.log("Une conversion est déjà en cours, veuillez attendre");
       return;
     }
 
@@ -273,8 +297,30 @@ export class VideosTableComponent {
       }
     }
 
-    // Lancer toutes les conversions
-    await this.conversionService.startAllSelectedConversions(selectedPaths);
+    // Lancer les conversions de manière séquentielle
+    await this.conversionService.startSequentialConversions(selectedPaths);
+  }
+
+  /**
+   * Arrête toutes les conversions en cours
+   */
+  async stopAllConversions(): Promise<void> {
+    // Empêche l'ouverture des détails
+    try {
+      const stopped = await this.conversionService.stopAllConversions();
+      if (stopped) {
+        console.log("Conversions arrêtées avec succès");
+      } else {
+        console.log("Aucune conversion en cours à arrêter");
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'arrêt des conversions:", error);
+    }
+  }
+
+  async stopConversion(event: Event): Promise<void> {
+    event.stopPropagation(); // Empêche l'ouverture des détails
+    await this.conversionService.stopConversion();
   }
 
   onPosterError(event: Event): void {
@@ -283,7 +329,8 @@ export class VideosTableComponent {
     img.style.display = "none";
   }
 
-  async openConvertedFile(videoPath: string): Promise<void> {
+  async openConvertedFile(videoPath: string, event: Event): Promise<void> {
+    event.stopPropagation(); // Empêche l'ouverture des détails
     const queueItem = this.conversionService.getQueueItem(videoPath);
     if (queueItem?.result?.success && queueItem.result.output_path) {
       try {

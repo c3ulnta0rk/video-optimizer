@@ -19,6 +19,7 @@ pub fn run() {
             video_commands::check_ffmpeg_available,
             video_commands::get_ffmpeg_output_formats,
             video_commands::start_video_conversion,
+            video_commands::stop_video_conversion,
             video_commands::open_file,
             video_commands::open_folder,
             window_commands::minimize_window,

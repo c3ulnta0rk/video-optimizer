@@ -24,10 +24,16 @@ export class MovieInfoComponent {
   public readonly showAlternativesButton = input<boolean>(false);
 
   public readonly openAlternatives = output<void>();
+  public readonly openManualSearch = output<void>();
 
   onOpenAlternatives(event: Event): void {
     event.stopPropagation();
     this.openAlternatives.emit();
+  }
+
+  onManualSearch(event: Event): void {
+    event.stopPropagation();
+    this.openManualSearch.emit();
   }
 
   getPosterUrl(posterPath: string | undefined): string {

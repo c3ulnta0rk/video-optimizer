@@ -1,4 +1,4 @@
-@if (selectedVideo()) {
+@if (currentVideo()) {
 <div class="video-details-container">
   <div class="details-header">
     <h4>Détails d'optimisation</h4>
@@ -8,22 +8,23 @@
   </div>
 
   <!-- Informations du film -->
-  @if (selectedVideo().movieInfo) {
+  @if (currentVideo()?.movieInfo) {
   <app-movie-info
-    [movieInfo]="selectedVideo().movieInfo"
+    [movieInfo]="currentVideo()!.movieInfo"
     [showAlternativesButton]="
       !!(
-        selectedVideo().movieAlternatives &&
-        (selectedVideo().movieAlternatives!.alternatives.length || 0) > 1
+        currentVideo()?.movieAlternatives &&
+        (currentVideo()!.movieAlternatives!.alternatives.length || 0) > 1
       )
     "
     (openAlternatives)="onOpenMovieAlternatives()"
+    (openManualSearch)="onManualSearch()"
   >
   </app-movie-info>
   }
 
   <!-- Technical Details -->
-  <app-technical-details [video]="selectedVideo()"></app-technical-details>
+  <app-technical-details [video]="currentVideo()!"></app-technical-details>
 
   <!-- Audio Tracks -->
   <app-audio-tracks-section
@@ -52,7 +53,7 @@
   <!-- Conversion Section -->
   <app-conversion-section
     [isConverting]="conversionState.isConverting"
-    [hasSelectedVideo]="!!selectedVideo()"
+    [hasSelectedVideo]="!!currentVideo()"
     [conversionState]="conversionState"
     (startConversion)="startConversion()"
     (stopConversion)="stopConversion()"

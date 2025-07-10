@@ -10,7 +10,11 @@ import {
 } from "./movie-title-parser.service";
 import { FfmpegFormatsService, FfmpegFormat } from "./ffmpeg-formats.service";
 import { FfmpegFormatsDialogComponent } from "../components/ffmpeg-formats-dialog/ffmpeg-formats-dialog.component";
-import { firstValueFrom } from "rxjs";
+import {
+  ManualSearchDialogComponent,
+  ManualSearchData,
+} from "../components/manual-search-dialog/manual-search-dialog.component";
+import { firstValueFrom, Observable, of, tap } from "rxjs";
 
 export interface AudioTrack {
   index: number;
@@ -592,13 +596,16 @@ export class FilesManagerService {
     const currentFiles = this.videoFiles();
     const fileIndex = currentFiles.findIndex((f) => f.path === filePath);
 
-    if (fileIndex === -1) return;
+    if (fileIndex === -1) {
+      return;
+    }
 
     const updatedFiles = [...currentFiles];
     updatedFiles[fileIndex] = {
       ...updatedFiles[fileIndex],
       movieInfo,
     };
+
     this.videoFiles.set(updatedFiles);
   }
 
@@ -653,5 +660,36 @@ export class FilesManagerService {
       movieInfo: this.movieInfoCache.size,
       alternatives: this.movieAlternativesCache.size,
     };
+  }
+
+  /**
+   * Ouvre le dialogue de recherche manuelle
+   */
+  public openManualSearchDialog(
+    filePath: string
+  ): Observable<MovieInfo | undefined> {
+    const currentFiles = this.videoFiles();
+    const file = currentFiles.find((f) => f.path === filePath);
+
+    if (!file) {
+      return of(undefined);
+    }
+
+    const dialogRef = this.dialog.open<
+      ManualSearchDialogComponent,
+      ManualSearchData,
+      MovieInfo | undefined
+    >(ManualSearchDialogComponent, {
+      width: "800px",
+      maxWidth: "90vw",
+      maxHeight: "80vh",
+      disableClose: false,
+      data: {
+        originalFileName: file.name,
+        originalQuery: file.movieInfo?.title || this.extractFileName(filePath),
+      } as ManualSearchData,
+    });
+
+    return dialogRef.afterClosed().pipe(tap(console.log));
   }
 }
