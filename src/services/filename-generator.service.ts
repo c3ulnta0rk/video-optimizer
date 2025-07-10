@@ -14,7 +14,7 @@ export interface AudioTrack {
 export interface OutputFileConfig {
   format: "mp4" | "mkv" | "avi" | "mov";
   quality: "1080p" | "720p" | "480p" | "4K";
-  codec: "h264" | "h265" | "vp9";
+  codec: "h264" | "h265" | "vp9" | "av1";
   audio: "aac" | "ac3" | "mp3" | "opus";
   crf: number; // Taux de compression (0-51, 20 par défaut)
   group?: string;
@@ -121,6 +121,7 @@ export class FilenameGeneratorService {
       h264: "x264",
       h265: "x265",
       vp9: "VP9",
+      av1: "AV1",
     };
     return codecMap[codec] || codec.toUpperCase();
   }
@@ -373,14 +374,16 @@ export class FilenameGeneratorService {
   /**
    * Suggère un codec vidéo basé sur la qualité
    */
-  public suggestVideoCodec(quality: string): "h264" | "h265" | "vp9" {
+  public suggestVideoCodec(quality: string): "h264" | "h265" | "vp9" | "av1" {
     switch (quality) {
       case "4K":
-        return "h265"; // Meilleure compression pour 4K
+        return "av1"; // AV1 pour 4K - meilleure compression
       case "1080p":
-        return "h265"; // H.265 par défaut pour 1080p aussi
+        return "h265"; // H.265 par défaut pour 1080p
+      case "720p":
+        return "h264"; // H.264 pour 720p - bon compromis
       default:
-        return "h265"; // H.265 par défaut pour tout
+        return "h264"; // H.264 par défaut pour compatibilité
     }
   }
 

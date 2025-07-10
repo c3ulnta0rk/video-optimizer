@@ -33,11 +33,25 @@ export interface ConversionResult {
   duration: number; // en secondes
 }
 
+export interface ConversionQueueItem {
+  video: VideoFile;
+  config: OutputFileConfig;
+  selectedAudioTracks: number[];
+  selectedSubtitleTracks: number[];
+  outputFilename?: string;
+  customOutputPath?: string | null;
+  status: "pending" | "converting" | "completed" | "error" | "cancelled";
+  progress: ConversionProgress | null;
+  result: ConversionResult | null;
+  error?: string;
+}
+
 export interface ConversionState {
   isConverting: boolean;
   progress: ConversionProgress | null;
   currentVideo: VideoFile | null;
   result: ConversionResult | null;
+  queue: ConversionQueueItem[];
 }
 
 @Injectable({
@@ -49,6 +63,7 @@ export class ConversionService {
     progress: null,
     currentVideo: null,
     result: null,
+    queue: [],
   });
 
   public readonly conversionState = this._conversionState.asReadonly();
@@ -84,6 +99,7 @@ export class ConversionService {
         progress: null,
         currentVideo: video,
         result: null,
+        queue: this._conversionState().queue,
       });
 
       // Préparer la configuration de conversion
@@ -133,6 +149,170 @@ export class ConversionService {
         },
       }));
     }
+  }
+
+  /**
+   * Ajoute une vidéo à la file d'attente de conversion
+   */
+  addToQueue(
+    video: VideoFile,
+    config: OutputFileConfig,
+    selectedAudioTracks: number[],
+    selectedSubtitleTracks: number[],
+    outputFilename?: string,
+    customOutputPath?: string | null
+  ): void {
+    const queueItem: ConversionQueueItem = {
+      video,
+      config,
+      selectedAudioTracks,
+      selectedSubtitleTracks,
+      outputFilename,
+      customOutputPath,
+      status: "pending",
+      progress: null,
+      result: null,
+    };
+
+    this._conversionState.update((state: ConversionState) => ({
+      ...state,
+      queue: [...state.queue, queueItem],
+    }));
+  }
+
+  /**
+   * Supprime une vidéo de la file d'attente
+   */
+  removeFromQueue(videoPath: string): void {
+    this._conversionState.update((state: ConversionState) => ({
+      ...state,
+      queue: state.queue.filter((item) => item.video.path !== videoPath),
+    }));
+  }
+
+  /**
+   * Démarre la conversion d'une vidéo spécifique de la file d'attente
+   */
+  async startConversionForVideo(videoPath: string): Promise<void> {
+    const state = this._conversionState();
+    const queueItem = state.queue.find((item) => item.video.path === videoPath);
+
+    if (!queueItem) {
+      console.error("Vidéo non trouvée dans la file d'attente");
+      return;
+    }
+
+    // Marquer comme en cours de conversion
+    this.updateQueueItemStatus(videoPath, "converting");
+
+    try {
+      await this.startConversion(
+        queueItem.video,
+        queueItem.config,
+        queueItem.selectedAudioTracks,
+        queueItem.selectedSubtitleTracks,
+        queueItem.outputFilename,
+        queueItem.customOutputPath
+      );
+
+      // Marquer comme terminé
+      this.updateQueueItemStatus(videoPath, "completed");
+    } catch (error) {
+      // Marquer comme erreur
+      this.updateQueueItemStatus(
+        videoPath,
+        "error",
+        error instanceof Error ? error.message : "Erreur inconnue"
+      );
+    }
+  }
+
+  /**
+   * Démarre la conversion de toutes les vidéos sélectionnées
+   */
+  async startAllSelectedConversions(
+    selectedVideoPaths: string[]
+  ): Promise<void> {
+    const state = this._conversionState();
+    const pendingItems = state.queue.filter(
+      (item) =>
+        selectedVideoPaths.includes(item.video.path) &&
+        item.status === "pending"
+    );
+
+    if (pendingItems.length === 0) {
+      console.log("Aucune vidéo sélectionnée pour la conversion");
+      return;
+    }
+
+    console.log(`Démarrage de la conversion de ${pendingItems.length} vidéos`);
+
+    // Traiter les vidéos séquentiellement pour éviter la surcharge
+    for (const item of pendingItems) {
+      try {
+        // Marquer comme en cours de conversion
+        this.updateQueueItemStatus(item.video.path, "converting");
+
+        await this.startConversion(
+          item.video,
+          item.config,
+          item.selectedAudioTracks,
+          item.selectedSubtitleTracks,
+          item.outputFilename,
+          item.customOutputPath
+        );
+
+        // Marquer comme terminé
+        this.updateQueueItemStatus(item.video.path, "completed");
+      } catch (error) {
+        // Marquer comme erreur
+        this.updateQueueItemStatus(
+          item.video.path,
+          "error",
+          error instanceof Error ? error.message : "Erreur inconnue"
+        );
+      }
+    }
+  }
+
+  /**
+   * Met à jour le statut d'un élément de la file d'attente
+   */
+  private updateQueueItemStatus(
+    videoPath: string,
+    status: ConversionQueueItem["status"],
+    error?: string
+  ): void {
+    this._conversionState.update((state: ConversionState) => ({
+      ...state,
+      queue: state.queue.map((item) =>
+        item.video.path === videoPath ? { ...item, status, error } : item
+      ),
+    }));
+  }
+
+  /**
+   * Met à jour la progression d'un élément de la file d'attente
+   */
+  updateQueueItemProgress(
+    videoPath: string,
+    progress: ConversionProgress
+  ): void {
+    this._conversionState.update((state: ConversionState) => ({
+      ...state,
+      queue: state.queue.map((item) =>
+        item.video.path === videoPath ? { ...item, progress } : item
+      ),
+    }));
+  }
+
+  /**
+   * Obtient un élément de la file d'attente par chemin de vidéo
+   */
+  getQueueItem(videoPath: string): ConversionQueueItem | undefined {
+    return this._conversionState().queue.find(
+      (item) => item.video.path === videoPath
+    );
   }
 
   /**

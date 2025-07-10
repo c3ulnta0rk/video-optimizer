@@ -474,6 +474,7 @@ pub async fn start_video_conversion(
         "h264" => "libx264",
         "h265" => "libx265",
         "vp9" => "libvpx-vp9",
+        "av1" => "libaom-av1",
         _ => "libx264",
     };
     

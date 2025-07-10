@@ -62,27 +62,51 @@ export class FilesManagerService {
   private readonly dialog = inject(MatDialog);
   private readonly ffmpegService = inject(FfmpegFormatsService);
 
+  // Cache pour les métadonnées et informations de films
+  private metadataCache = new Map<string, Partial<VideoFile>>();
+  private movieInfoCache = new Map<string, MovieInfo>();
+  private movieAlternativesCache = new Map<string, MovieSearchResult>();
+
   constructor() {
     effect(() => {
-      // Mettre à jour la liste des fichiers
-      this.videoFiles.set(this.convertPathsToVideoFiles(this.videosPaths()));
+      const paths = this.videosPaths();
+      const currentFiles = this.videoFiles();
 
-      // Charger automatiquement les infos du film après un délai
-      setTimeout(() => {
-        this.loadAllMovieInfoSequentially();
-      }, 200); // Délai plus long pour laisser le temps aux métadonnées de se charger
+      // Vérifier si la liste a vraiment changé pour éviter les rebuilds inutiles
+      const pathsChanged = this.hasPathsChanged(paths, currentFiles);
+
+      if (pathsChanged) {
+        // Mettre à jour la liste des fichiers avec le cache
+        this.videoFiles.set(this.convertPathsToVideoFilesWithCache(paths));
+      }
     });
+  }
+
+  /**
+   * Vérifie si les chemins ont changé pour éviter les rebuilds inutiles
+   */
+  private hasPathsChanged(paths: string[], currentFiles: VideoFile[]): boolean {
+    if (paths.length !== currentFiles.length) return true;
+
+    const currentPaths = currentFiles.map((f) => f.path);
+    return !paths.every((path, index) => path === currentPaths[index]);
   }
 
   /**
    * Ajoute des chemins de vidéos à la liste
    */
   public async addVideosPaths(paths: string[]) {
+    // Filtrer les chemins qui ne sont pas déjà dans la liste
+    const currentPaths = this.videosPaths();
+    const newPaths = paths.filter((path) => !currentPaths.includes(path));
+
+    if (newPaths.length === 0) return; // Pas de nouveaux chemins
+
     // Ajouter les nouveaux chemins
-    const allPaths = [...this.videosPaths(), ...paths];
+    const allPaths = [...currentPaths, ...newPaths];
     this.videosPaths.set(allPaths);
 
-    // Charger automatiquement les métadonnées pour les nouveaux fichiers
+    // Charger automatiquement les métadonnées pour les nouveaux fichiers seulement
     setTimeout(() => {
       this.loadVideoMetadataSequentially();
     }, 100);
@@ -95,6 +119,11 @@ export class FilesManagerService {
     const currentPaths = this.videosPaths();
     const updatedPaths = currentPaths.filter((path) => path !== videoPath);
     this.videosPaths.set(updatedPaths);
+
+    // Nettoyer le cache pour cette vidéo
+    this.metadataCache.delete(videoPath);
+    this.movieInfoCache.delete(videoPath);
+    this.movieAlternativesCache.delete(videoPath);
 
     // Si la vidéo supprimée était sélectionnée, on désélectionne
     if (this.selectedVideo()?.path === videoPath) {
@@ -132,6 +161,35 @@ export class FilesManagerService {
       fps: 0,
       loading: true,
     }));
+  }
+
+  /**
+   * Convertit les chemins en objets VideoFile avec utilisation du cache
+   */
+  private convertPathsToVideoFilesWithCache(paths: string[]): VideoFile[] {
+    return paths.map((path) => {
+      const cachedMetadata = this.metadataCache.get(path);
+      const cachedMovieInfo = this.movieInfoCache.get(path);
+      const cachedAlternatives = this.movieAlternativesCache.get(path);
+
+      return {
+        path,
+        name: this.extractFileName(path),
+        size: cachedMetadata?.size || 0,
+        duration: cachedMetadata?.duration || 0,
+        resolution: cachedMetadata?.resolution || "Unknown",
+        codec: cachedMetadata?.codec || "Unknown",
+        bitrate: cachedMetadata?.bitrate || 0,
+        fps: cachedMetadata?.fps || 0,
+        audio_tracks: cachedMetadata?.audio_tracks || [],
+        subtitle_tracks: cachedMetadata?.subtitle_tracks || [],
+        error: cachedMetadata?.error,
+        loading: cachedMetadata ? false : true,
+        movieInfo: cachedMovieInfo,
+        movieInfoLoading: cachedMovieInfo ? false : true,
+        movieAlternatives: cachedAlternatives,
+      };
+    });
   }
 
   /**
@@ -372,6 +430,12 @@ export class FilesManagerService {
     filePath: string,
     metadata: Partial<VideoFile>
   ) {
+    // Mettre en cache les métadonnées
+    this.metadataCache.set(filePath, {
+      ...this.metadataCache.get(filePath),
+      ...metadata,
+    });
+
     const currentFiles = this.videoFiles();
     const updatedFiles = currentFiles.map((file) =>
       file.path === filePath ? { ...file, ...metadata } : file
@@ -395,6 +459,23 @@ export class FilesManagerService {
    * Charge les informations du film pour un fichier vidéo
    */
   public async loadMovieInfo(filePath: string): Promise<void> {
+    // Vérifier le cache d'abord
+    const cachedMovieInfo = this.movieInfoCache.get(filePath);
+    if (cachedMovieInfo) {
+      const currentFiles = this.videoFiles();
+      const fileIndex = currentFiles.findIndex((f) => f.path === filePath);
+      if (fileIndex !== -1) {
+        const updatedFiles = [...currentFiles];
+        updatedFiles[fileIndex] = {
+          ...updatedFiles[fileIndex],
+          movieInfo: cachedMovieInfo,
+          movieInfoLoading: false,
+        };
+        this.videoFiles.set(updatedFiles);
+      }
+      return;
+    }
+
     const currentFiles = this.videoFiles();
     const fileIndex = currentFiles.findIndex((f) => f.path === filePath);
 
@@ -420,19 +501,22 @@ export class FilesManagerService {
       // Pour l'instant, on utilise le film sélectionné par défaut
       const movieInfo = searchResult.selected;
 
+      // Mettre en cache
+      this.movieInfoCache.set(filePath, movieInfo);
+      if (searchResult.alternatives.length > 1) {
+        this.movieAlternativesCache.set(filePath, searchResult);
+      }
+
       // Mettre à jour avec les infos du film
       const finalFiles = [...this.videoFiles()];
       finalFiles[fileIndex] = {
         ...finalFiles[fileIndex],
         movieInfo,
         movieInfoLoading: false,
+        movieAlternatives:
+          searchResult.alternatives.length > 1 ? searchResult : undefined,
       };
       this.videoFiles.set(finalFiles);
-
-      // Stocker les alternatives pour une utilisation future
-      if (searchResult.alternatives.length > 1) {
-        finalFiles[fileIndex].movieAlternatives = searchResult;
-      }
     } catch (error) {
       console.error("Erreur lors du chargement des infos du film:", error);
 
@@ -475,7 +559,7 @@ export class FilesManagerService {
     for (const file of sortedFiles) {
       await this.loadMovieInfo(file.path);
       // Ajouter un petit délai entre chaque requête pour éviter de surcharger l'API
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
   }
 
@@ -502,6 +586,9 @@ export class FilesManagerService {
    * Met à jour les informations du film après sélection dans le dialogue
    */
   public updateMovieInfo(filePath: string, movieInfo: MovieInfo): void {
+    // Mettre en cache les informations du film
+    this.movieInfoCache.set(filePath, movieInfo);
+
     const currentFiles = this.videoFiles();
     const fileIndex = currentFiles.findIndex((f) => f.path === filePath);
 
@@ -542,5 +629,29 @@ export class FilesManagerService {
    */
   public getCommonOutputFormats(): FfmpegFormat[] {
     return this.ffmpegService.getCommonVideoFormats();
+  }
+
+  /**
+   * Nettoie le cache pour libérer la mémoire
+   */
+  public clearCache(): void {
+    this.metadataCache.clear();
+    this.movieInfoCache.clear();
+    this.movieAlternativesCache.clear();
+  }
+
+  /**
+   * Obtient la taille du cache pour le debugging
+   */
+  public getCacheSize(): {
+    metadata: number;
+    movieInfo: number;
+    alternatives: number;
+  } {
+    return {
+      metadata: this.metadataCache.size,
+      movieInfo: this.movieInfoCache.size,
+      alternatives: this.movieAlternativesCache.size,
+    };
   }
 }

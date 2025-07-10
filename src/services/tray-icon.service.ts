@@ -7,7 +7,7 @@ import { defaultWindowIcon } from "@tauri-apps/api/app";
 })
 export class TrayIconService {
   constructor() {
-    this.init();
+    // this.init();
   }
 
   async init() {

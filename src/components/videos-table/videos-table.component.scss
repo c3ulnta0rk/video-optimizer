@@ -11,10 +11,37 @@
   transition: background-color 0.3s ease, border-color 0.3s ease;
 
   .table-header {
-    h3 {
-      margin: 0;
-      color: var(--app-text-primary);
-      font-weight: 500;
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+
+      h3 {
+        margin: 0;
+        color: var(--app-text-primary);
+        font-weight: 500;
+        flex: 1;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+
+        button {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-weight: 500;
+
+          mat-icon {
+            font-size: 18px;
+            width: 18px;
+            height: 18px;
+          }
+        }
+      }
     }
   }
 
@@ -48,6 +75,19 @@
           color: var(--app-text-secondary);
           font-size: 20px;
           transition: color 0.3s ease;
+        }
+
+        .movie-poster {
+          width: 40px;
+          height: 60px;
+          object-fit: cover;
+          border-radius: 4px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          transition: transform 0.2s ease;
+
+          &:hover {
+            transform: scale(1.05);
+          }
         }
 
         .file-name {
@@ -88,6 +128,56 @@
         color: #f44336;
         font-size: 12px;
         font-style: italic;
+      }
+
+      .conversion-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+
+        .conversion-pending {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+
+          .conversion-progress {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            width: 100%;
+            margin-left: 8px;
+
+            mat-progress-bar {
+              width: 100%;
+            }
+
+            .progress-text {
+              font-size: 11px;
+              color: var(--app-text-secondary);
+              font-family: "Courier New", monospace;
+            }
+          }
+
+          .conversion-completed {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #4caf50;
+            font-size: 12px;
+            margin-left: 8px;
+          }
+
+          .conversion-error {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #f44336;
+            font-size: 12px;
+            margin-left: 8px;
+          }
+        }
       }
 
       .actions-container {
@@ -148,11 +238,31 @@
         }
 
         .file-info {
+          .movie-poster {
+            width: 30px;
+            height: 45px;
+          }
+
           .file-name {
             max-width: 150px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+          }
+        }
+
+        .conversion-container {
+          .conversion-pending {
+            .conversion-progress {
+              .progress-text {
+                font-size: 10px;
+              }
+            }
+
+            .conversion-completed,
+            .conversion-error {
+              font-size: 11px;
+            }
           }
         }
       }
