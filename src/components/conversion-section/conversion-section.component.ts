@@ -1,4 +1,4 @@
-import { Component, input, output, inject } from "@angular/core";
+import { Component, input, output, inject, computed } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { MatIconModule } from "@angular/material/icon";
 import { MatButtonModule } from "@angular/material/button";
@@ -17,10 +17,29 @@ export class ConversionSectionComponent {
   public readonly isConverting = input<boolean>(false);
   public readonly hasSelectedVideo = input<boolean>(false);
   public readonly conversionState = input<any>({});
+  public readonly currentVideoPath = input<string | null>(null);
   public readonly startConversion = output<void>();
   public readonly stopConversion = output<void>();
 
   private readonly fileOpener = inject(FileOpenerService);
+  private readonly conversionService = inject(ConversionService);
+
+  // Méthodes pour récupérer la progression de la vidéo en cours
+  getCurrentProgress() {
+    const videoPath = this.currentVideoPath();
+    if (!videoPath) return null;
+
+    const queueItem = this.conversionService.getQueueItem(videoPath);
+    return queueItem?.progress || null;
+  }
+
+  getCurrentResult() {
+    const videoPath = this.currentVideoPath();
+    if (!videoPath) return null;
+
+    const queueItem = this.conversionService.getQueueItem(videoPath);
+    return queueItem?.result || null;
+  }
 
   formatTime(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
@@ -41,10 +60,10 @@ export class ConversionSectionComponent {
   }
 
   async openOutputFile(): Promise<void> {
-    const result = this.conversionState();
-    if (result?.result?.success && result.result.output_path) {
+    const result = this.getCurrentResult();
+    if (result?.success && result.output_path) {
       try {
-        await this.fileOpener.openFile(result.result.output_path);
+        await this.fileOpener.openFile(result.output_path);
       } catch (error) {
         console.error("Erreur lors de l'ouverture du fichier:", error);
       }
@@ -52,10 +71,10 @@ export class ConversionSectionComponent {
   }
 
   async openFileLocation(): Promise<void> {
-    const result = this.conversionState();
-    if (result?.result?.success && result.result.output_path) {
+    const result = this.getCurrentResult();
+    if (result?.success && result.output_path) {
       try {
-        await this.fileOpener.openFileLocation(result.result.output_path);
+        await this.fileOpener.openFileLocation(result.output_path);
       } catch (error) {
         console.error("Erreur lors de l'ouverture du dossier:", error);
       }

@@ -1,67 +1,68 @@
 @if (currentVideo()) {
-<div class="video-details-container">
-  <div class="details-header">
-    <h4>Détails d'optimisation</h4>
-    <button mat-icon-button (click)="onCloseDetails()">
-      <mat-icon>close</mat-icon>
-    </button>
+  <div class="video-details-container">
+    <div class="details-header">
+      <h4>Détails d'optimisation</h4>
+      <button mat-icon-button (click)="onCloseDetails()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+
+    <!-- Informations du film -->
+    @if (currentVideo()?.movieInfo) {
+      <app-movie-info
+        [movieInfo]="currentVideo()!.movieInfo"
+        [showAlternativesButton]="
+          !!(
+            currentVideo()?.movieAlternatives &&
+            (currentVideo()!.movieAlternatives!.alternatives.length || 0) > 1
+          )
+        "
+        (openAlternatives)="onOpenMovieAlternatives()"
+        (openManualSearch)="onManualSearch()"
+      >
+      </app-movie-info>
+    }
+
+    <!-- Technical Details -->
+    <app-technical-details [video]="currentVideo()!"></app-technical-details>
+
+    <!-- Audio Tracks -->
+    <app-audio-tracks-section
+      [audioTracks]="audioTracks"
+      [selectedTracks]="selectedAudioTracks"
+      (tracksChanged)="onAudioTracksChanged($event)"
+    ></app-audio-tracks-section>
+
+    <!-- Subtitles -->
+    <app-subtitle-tracks-section
+      [subtitleTracks]="subtitleTracks"
+      [selectedTracks]="selectedSubtitleTracks"
+      (tracksChanged)="onSubtitleTracksChanged($event)"
+    ></app-subtitle-tracks-section>
+
+    <!-- Output Configuration -->
+    <app-output-config-section
+      [outputConfig]="outputConfig()"
+      [generatedFilename]="generatedFilename()"
+      [currentOutputPath]="getCurrentOutputPath()"
+      (configChanged)="onConfigChange($event)"
+      (filenameChanged)="onFilenameChange($event)"
+      (selectOutputPath)="selectCustomOutputPath()"
+    ></app-output-config-section>
+
+    <!-- Conversion Section -->
+    <app-conversion-section
+      [isConverting]="conversionState.isConverting"
+      [hasSelectedVideo]="!!currentVideo()"
+      [conversionState]="conversionState"
+      [currentVideoPath]="currentVideo()?.path || null"
+      (startConversion)="startConversion()"
+      (stopConversion)="stopConversion()"
+    ></app-conversion-section>
   </div>
-
-  <!-- Informations du film -->
-  @if (currentVideo()?.movieInfo) {
-  <app-movie-info
-    [movieInfo]="currentVideo()!.movieInfo"
-    [showAlternativesButton]="
-      !!(
-        currentVideo()?.movieAlternatives &&
-        (currentVideo()!.movieAlternatives!.alternatives.length || 0) > 1
-      )
-    "
-    (openAlternatives)="onOpenMovieAlternatives()"
-    (openManualSearch)="onManualSearch()"
-  >
-  </app-movie-info>
-  }
-
-  <!-- Technical Details -->
-  <app-technical-details [video]="currentVideo()!"></app-technical-details>
-
-  <!-- Audio Tracks -->
-  <app-audio-tracks-section
-    [audioTracks]="audioTracks"
-    [selectedTracks]="selectedAudioTracks"
-    (tracksChanged)="onAudioTracksChanged($event)"
-  ></app-audio-tracks-section>
-
-  <!-- Subtitles -->
-  <app-subtitle-tracks-section
-    [subtitleTracks]="subtitleTracks"
-    [selectedTracks]="selectedSubtitleTracks"
-    (tracksChanged)="onSubtitleTracksChanged($event)"
-  ></app-subtitle-tracks-section>
-
-  <!-- Output Configuration -->
-  <app-output-config-section
-    [outputConfig]="outputConfig()"
-    [generatedFilename]="generatedFilename()"
-    [currentOutputPath]="getCurrentOutputPath()"
-    (configChanged)="onConfigChange($event)"
-    (filenameChanged)="onFilenameChange($event)"
-    (selectOutputPath)="selectCustomOutputPath()"
-  ></app-output-config-section>
-
-  <!-- Conversion Section -->
-  <app-conversion-section
-    [isConverting]="conversionState.isConverting"
-    [hasSelectedVideo]="!!currentVideo()"
-    [conversionState]="conversionState"
-    (startConversion)="startConversion()"
-    (stopConversion)="stopConversion()"
-  ></app-conversion-section>
-</div>
 } @else {
-<div class="no-selection">
-  <mat-icon>info</mat-icon>
-  <p>Select a video to view optimization details</p>
-</div>
+  <div class="no-selection">
+    <mat-icon>info</mat-icon>
+    <p>Select a video to view optimization details</p>
+  </div>
 }

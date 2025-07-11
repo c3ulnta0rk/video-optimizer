@@ -413,7 +413,14 @@ export class VideoDetailsComponent {
       };
     }
 
-    await this.conversionService.startConversion(
+    // Vérifier si la vidéo était annulée et la réinitialiser
+    const queueItem = this.conversionService.getQueueItem(video.path);
+    if (queueItem?.status === "cancelled") {
+      this.conversionService.resetCancelledVideo(video.path);
+    }
+
+    // Ajouter à la file d'attente
+    this.conversionService.addToQueue(
       video,
       this.outputConfig(),
       selectedAudioTracks,
@@ -422,6 +429,9 @@ export class VideoDetailsComponent {
       customPath,
       movieMetadata
     );
+
+    // Démarrer la conversion
+    await this.conversionService.startConversionForVideo(video.path);
   }
 
   stopConversion(): void {
