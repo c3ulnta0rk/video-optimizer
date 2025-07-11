@@ -40,6 +40,7 @@ import {
   MovieMetadata,
 } from "../../services/conversion.service";
 import { DirectorySelectorService } from "../../services/directory-selector.service";
+import { VideoConfigService } from "../../services/video-config.service";
 
 @Component({
   selector: "app-video-details",
@@ -77,6 +78,7 @@ export class VideoDetailsComponent {
   private readonly settingsService = inject(SettingsService);
   private readonly conversionService = inject(ConversionService);
   private readonly directorySelector = inject(DirectorySelectorService);
+  private readonly videoConfigService = inject(VideoConfigService);
 
   // Computed pour récupérer les données à jour du service
   public readonly currentVideo = computed(() => {
@@ -242,6 +244,9 @@ export class VideoDetailsComponent {
       );
       this.generatedFilename.set(filename);
     }
+
+    // Sauvegarder la configuration
+    this.saveVideoConfiguration();
   }
 
   /**
@@ -270,6 +275,9 @@ export class VideoDetailsComponent {
 
   onSubtitleTracksChanged(tracks: Set<number>): void {
     this.selectedSubtitleTracks = tracks;
+
+    // Sauvegarder la configuration
+    this.saveVideoConfiguration();
   }
 
   getConfidenceColor(confidence: number): string {
@@ -299,6 +307,9 @@ export class VideoDetailsComponent {
     this.settingsService.updateVideoConfig(newConfig).catch((error) => {
       console.error("Erreur lors de la sauvegarde de la configuration:", error);
     });
+
+    // Sauvegarder la configuration spécifique à cette vidéo
+    this.saveVideoConfiguration();
   }
 
   onCrfChange(event: Event): void {
@@ -324,12 +335,18 @@ export class VideoDetailsComponent {
         });
       }
     }
+
+    // Sauvegarder la configuration
+    this.saveVideoConfiguration();
   }
 
   async selectCustomOutputPath(): Promise<void> {
     const selectedPath = await this.directorySelector.selectDirectory();
     if (selectedPath !== null) {
       this.customOutputPath.set(selectedPath);
+
+      // Sauvegarder la configuration
+      this.saveVideoConfiguration();
     }
   }
 
@@ -436,6 +453,46 @@ export class VideoDetailsComponent {
 
   stopConversion(): void {
     this.conversionService.stopConversion();
+  }
+
+  /**
+   * Sauvegarde la configuration actuelle de la vidéo
+   */
+  private saveVideoConfiguration(): void {
+    const video = this.currentVideo();
+    if (!video) return;
+
+    const selectedAudioTracks = Array.from(this.selectedAudioTracks);
+    const selectedSubtitleTracks = Array.from(this.selectedSubtitleTracks);
+    const generatedFilename = this.generatedFilename();
+    const customOutputPath = this.customOutputPath();
+
+    // Préparer les métadonnées du film si disponibles
+    let movieMetadata: MovieMetadata | undefined;
+    if (video.movieInfo) {
+      movieMetadata = {
+        title: video.movieInfo.title,
+        year: video.movieInfo.releaseDate
+          ? new Date(video.movieInfo.releaseDate).getFullYear()
+          : video.movieInfo.year,
+        overview: video.movieInfo.overview,
+        director: undefined,
+        cast: [],
+        genre: video.movieInfo.genres || [],
+        rating: video.movieInfo.voteAverage,
+        poster_path: video.movieInfo.posterPath,
+      };
+    }
+
+    this.videoConfigService.saveVideoConfig(
+      video.path,
+      this.outputConfig(),
+      selectedAudioTracks,
+      selectedSubtitleTracks,
+      generatedFilename,
+      customOutputPath,
+      movieMetadata
+    );
   }
 
   onManualSearch(): void {

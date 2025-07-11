@@ -28,6 +28,7 @@ import {
   MovieMetadata,
 } from "../../services/conversion.service";
 import { FileOpenerService } from "../../services/file-opener.service";
+import { VideoConfigService } from "../../services/video-config.service";
 import { MovieAlternativesDialogComponent } from "../movie-alternatives-dialog/movie-alternatives-dialog.component";
 import { VideoDetailsDialogComponent } from "../video-details-dialog/video-details-dialog.component";
 
@@ -56,6 +57,7 @@ export class VideosTableComponent {
   public readonly conversionService = inject(ConversionService);
   private readonly filesManager = inject(FilesManagerService);
   private readonly fileOpener = inject(FileOpenerService);
+  private readonly videoConfigService = inject(VideoConfigService);
 
   public readonly displayedColumns = signal<string[]>([
     "name",
@@ -198,32 +200,26 @@ export class VideosTableComponent {
     }
   }
 
-  async startConversion(video: VideoFile): Promise<void> {
+  async startConversion(event: Event, video: VideoFile): Promise<void> {
+    event.stopPropagation(); // Empêche l'ouverture des détails
     // Vérifier si la vidéo était annulée et la réinitialiser
     const queueItem = this.conversionService.getQueueItem(video.path);
     if (queueItem?.status === "cancelled") {
       this.conversionService.resetCancelledVideo(video.path);
     }
 
-    // Pour l'instant, on utilise une configuration par défaut
-    // TODO: Récupérer la configuration depuis les détails de la vidéo
-    const config = {
-      format: "mkv" as const,
-      quality: "1080p" as const,
-      codec: "h265" as const,
-      audio: "aac" as const,
-      crf: 20,
-      group: "VideoOptimizer",
-    };
+    // Récupérer ou créer la configuration pour cette vidéo
+    const videoConfig = this.videoConfigService.getOrCreateVideoConfig(video);
 
     // Ajouter à la file d'attente
     this.conversionService.addToQueue(
       video,
-      config,
-      [], // selectedAudioTracks - à récupérer depuis les détails
-      [], // selectedSubtitleTracks - à récupérer depuis les détails
-      undefined, // outputFilename
-      null // customOutputPath
+      videoConfig.config,
+      videoConfig.selectedAudioTracks,
+      videoConfig.selectedSubtitleTracks,
+      videoConfig.generatedFilename?.filename,
+      videoConfig.customOutputPath,
+      videoConfig.movieMetadata
     );
 
     // Démarrer la conversion
@@ -254,45 +250,22 @@ export class VideosTableComponent {
       return;
     }
 
-    // Ajouter toutes les vidéos sélectionnées à la file d'attente
-    const config = {
-      format: "mkv" as const,
-      quality: "1080p" as const,
-      codec: "h265" as const,
-      audio: "aac" as const,
-      crf: 20,
-      group: "VideoOptimizer",
-    };
-
     // Ajouter chaque vidéo sélectionnée à la file d'attente
     for (const videoPath of selectedPaths) {
       const video = this.videoFiles().find((v) => v.path === videoPath);
       if (video) {
-        // Préparer les métadonnées du film si disponibles
-        let movieMetadata: MovieMetadata | undefined;
-        if (video.movieInfo) {
-          movieMetadata = {
-            title: video.movieInfo.title,
-            year: video.movieInfo.releaseDate
-              ? new Date(video.movieInfo.releaseDate).getFullYear()
-              : video.movieInfo.year,
-            overview: video.movieInfo.overview,
-            director: undefined, // Non disponible dans MovieInfo
-            cast: [], // Non disponible dans MovieInfo
-            genre: video.movieInfo.genres || [],
-            rating: video.movieInfo.voteAverage,
-            poster_path: video.movieInfo.posterPath,
-          };
-        }
+        // Récupérer ou créer la configuration pour cette vidéo
+        const videoConfig =
+          this.videoConfigService.getOrCreateVideoConfig(video);
 
         this.conversionService.addToQueue(
           video,
-          config,
-          [], // selectedAudioTracks - à récupérer depuis les détails
-          [], // selectedSubtitleTracks - à récupérer depuis les détails
-          undefined, // outputFilename
-          null, // customOutputPath
-          movieMetadata
+          videoConfig.config,
+          videoConfig.selectedAudioTracks,
+          videoConfig.selectedSubtitleTracks,
+          videoConfig.generatedFilename?.filename,
+          videoConfig.customOutputPath,
+          videoConfig.movieMetadata
         );
       }
     }
