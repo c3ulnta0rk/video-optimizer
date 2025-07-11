@@ -3,6 +3,9 @@ use std::process::{Command, Stdio, Child};
 use std::path::Path;
 use std::io::{BufRead, BufReader};
 use std::sync::Mutex;
+use std::time::Duration;
+use std::thread;
+use std::sync::mpsc;
 use tauri::command;
 use tauri::Emitter;
 
@@ -577,64 +580,172 @@ pub async fn start_video_conversion(
         *process_guard = Some(child);
     }
 
-    let stdout_reader = BufReader::new(stdout);
-    let stderr_reader = BufReader::new(stderr);
+    // Créer des canaux pour la communication entre threads
+    let (progress_tx, progress_rx) = mpsc::channel();
+    let (error_tx, error_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
 
-    let mut current_time = 0.0;
-    let mut error_output = String::new();
+    // Thread pour lire stdout (progression)
+    let window_clone = window.clone();
+    let input_path = config.input_path.clone();
+    thread::spawn(move || {
+        let stdout_reader = BufReader::new(stdout);
+        let mut last_progress_time = std::time::Instant::now();
 
-    // Lire la progression sur stdout
-    for line in stdout_reader.lines() {
-        let line = line.map_err(|e| format!("Erreur de lecture: {}", e))?;
-        if line.starts_with("out_time_ms=") {
-            if let Some(time_str) = line.split('=').nth(1) {
-                if let Ok(time_ms) = time_str.parse::<u64>() {
-                    current_time = time_ms as f64 / 1_000_000.0;
+        for line in stdout_reader.lines() {
+            match line {
+                Ok(line) => {
+                    if line.starts_with("out_time_ms=") {
+                        if let Some(time_str) = line.split('=').nth(1) {
+                            if let Ok(time_ms) = time_str.parse::<u64>() {
+                                let current_time = time_ms as f64 / 1_000_000.0;
+                                
+                                // Calculer la progression
+                                if total_time > 0.0 {
+                                    let progress = (current_time / total_time).min(1.0);
+                                    let elapsed = start_time.elapsed().as_secs_f64();
+                                    let eta = if progress > 0.0 { elapsed / progress - elapsed } else { 0.0 };
+
+                                    let progress_data = ConversionProgress {
+                                        progress,
+                                        current_time,
+                                        total_time,
+                                        speed: 0.0,
+                                        eta,
+                                        status: format!("Conversion en cours... {:.1}%", progress * 100.0),
+                                    };
+                                    
+                                    // Émettre l'événement avec le chemin de la vidéo
+                                    let progress_event = serde_json::json!({
+                                        "video_path": input_path,
+                                        "progress": progress_data
+                                    });
+                                    window_clone.emit("conversion_progress", progress_event).ok();
+                                    
+                                    // Mettre à jour le temps de dernière progression
+                                    last_progress_time = std::time::Instant::now();
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Vérifier si on n'a pas reçu de progression depuis trop longtemps (timeout de 30 secondes)
+                    if last_progress_time.elapsed() > Duration::from_secs(30) {
+                        println!("Timeout: Aucune progression depuis 30 secondes");
+                        let _ = progress_tx.send("timeout".to_string());
+                        break;
+                    }
+                }
+                Err(e) => {
+                    println!("Erreur de lecture stdout: {}", e);
+                    let _ = progress_tx.send(format!("stdout_error: {}", e));
+                    break;
                 }
             }
         }
-        // Calculer la progression
-        if total_time > 0.0 {
-            let progress = (current_time / total_time).min(1.0);
-            let elapsed = start_time.elapsed().as_secs_f64();
-            let eta = if progress > 0.0 { elapsed / progress - elapsed } else { 0.0 };
+    });
 
-            let progress_data = ConversionProgress {
-                progress,
-                current_time,
-                total_time,
-                speed: 0.0,
-                eta,
-                status: format!("Conversion en cours... {:.1}%", progress * 100.0),
-            };
-            
-            // Émettre l'événement avec le chemin de la vidéo
-            let progress_event = serde_json::json!({
-                "video_path": config.input_path,
-                "progress": progress_data
-            });
-            window.emit("conversion_progress", progress_event).ok();
-        }
-    }
+    // Thread pour lire stderr (erreurs)
+    thread::spawn(move || {
+        let stderr_reader = BufReader::new(stderr);
+        let mut error_output = String::new();
 
-    // Lire les erreurs de stderr (pour le log)
-    for line in stderr_reader.lines() {
-        if let Ok(line) = line {
-            error_output.push_str(&line);
-            error_output.push('\n');
+        for line in stderr_reader.lines() {
+            match line {
+                Ok(line) => {
+                    error_output.push_str(&line);
+                    error_output.push('\n');
+                    
+                    // Détecter les erreurs critiques
+                    if line.contains("Error") || line.contains("error") {
+                        let _ = error_tx.send(error_output.clone());
+                    }
+                }
+                Err(e) => {
+                    println!("Erreur de lecture stderr: {}", e);
+                    let _ = error_tx.send(format!("stderr_error: {}", e));
+                    break;
+                }
+            }
         }
-    }
-    
-    // Attendre la fin du processus en le récupérant de la variable globale
-    let status = {
+        
+        // Envoyer toutes les erreurs à la fin
+        let _ = error_tx.send(error_output);
+    });
+
+    // Thread pour surveiller le processus
+    thread::spawn(move || {
         let mut process_guard = FFMPEG_PROCESS.lock().unwrap();
         if let Some(mut child) = process_guard.take() {
-            child.wait().map_err(|e| format!("Erreur lors de l'attente: {}", e))?
+            match child.wait() {
+                Ok(status) => {
+                    let _ = done_tx.send(Ok(status));
+                }
+                Err(e) => {
+                    let _ = done_tx.send(Err(format!("Erreur lors de l'attente: {}", e)));
+                }
+            }
         } else {
-            return Err("Processus FFmpeg non trouvé".to_string());
+            let _ = done_tx.send(Err("Processus FFmpeg non trouvé".to_string()));
         }
-    };
+    });
+
+    // Attendre les résultats avec timeout
+    let mut error_output = String::new();
+    let mut process_status = None;
     
+    loop {
+        // Vérifier les messages avec un timeout court
+        match progress_rx.recv_timeout(Duration::from_millis(100)) {
+            Ok(msg) => {
+                if msg.starts_with("timeout") {
+                    return Err("Timeout: Aucune progression depuis 30 secondes".to_string());
+                } else if msg.starts_with("stdout_error") {
+                    return Err(msg);
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                // Timeout normal, continuer
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                // Canal fermé, sortir de la boucle
+                break;
+            }
+        }
+        
+        // Vérifier les erreurs
+        match error_rx.try_recv() {
+            Ok(error_msg) => {
+                if error_msg.starts_with("stderr_error") {
+                    return Err(error_msg);
+                }
+                error_output = error_msg;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // Pas d'erreur pour l'instant
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                // Canal fermé
+                break;
+            }
+        }
+        
+        // Vérifier si le processus est terminé
+        match done_rx.try_recv() {
+            Ok(status_result) => {
+                process_status = Some(status_result);
+                break;
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                // Processus encore en cours
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                return Err("Canal de statut fermé".to_string());
+            }
+        }
+    }
+    
+    let status = process_status.ok_or("Aucun statut de processus reçu")??;
     let duration = start_time.elapsed().as_secs_f64();
     
     if status.success() {
@@ -669,6 +780,16 @@ pub async fn stop_video_conversion() -> Result<bool, String> {
         match child.kill() {
             Ok(_) => {
                 println!("Processus FFmpeg arrêté avec succès");
+                
+                // Attendre un peu que le processus se termine proprement
+                // Note: on utilise un thread séparé pour éviter le blocage
+                thread::spawn(move || {
+                    match child.wait() {
+                        Ok(_) => println!("Processus FFmpeg terminé proprement"),
+                        Err(_) => println!("Processus FFmpeg forcé à se terminer"),
+                    }
+                });
+                
                 Ok(true)
             },
             Err(e) => {
@@ -680,6 +801,39 @@ pub async fn stop_video_conversion() -> Result<bool, String> {
         println!("Aucun processus FFmpeg en cours");
         Ok(false)
     }
+}
+
+#[command]
+pub async fn cleanup_ffmpeg_processes() -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        // Sur Linux, utiliser pkill pour tuer tous les processus ffmpeg
+        let _ = Command::new("pkill")
+            .args(&["-f", "ffmpeg"])
+            .output();
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+        // Sur Windows, utiliser taskkill
+        let _ = Command::new("taskkill")
+            .args(&["/F", "/IM", "ffmpeg.exe"])
+            .output();
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        // Sur macOS, utiliser pkill
+        let _ = Command::new("pkill")
+            .args(&["-f", "ffmpeg"])
+            .output();
+    }
+    
+    // Nettoyer la variable globale
+    let mut process_guard = FFMPEG_PROCESS.lock().unwrap();
+    *process_guard = None;
+    
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]

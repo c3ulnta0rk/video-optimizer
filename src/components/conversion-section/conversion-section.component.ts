@@ -59,6 +59,30 @@ export class ConversionSectionComponent {
     return `${(progress * 100).toFixed(1)}%`;
   }
 
+  /**
+   * Gère les erreurs de conversion avec des messages plus informatifs
+   */
+  handleConversionError(error: any): string {
+    if (error?.message) {
+      const errorMessage = error.message;
+
+      if (
+        errorMessage.includes("timeout") ||
+        errorMessage.includes("Timeout")
+      ) {
+        return "La conversion a pris trop de temps et a été interrompue. Vérifiez que le fichier source n'est pas corrompu et réessayez.";
+      }
+
+      if (errorMessage.includes("ffmpeg") || errorMessage.includes("FFmpeg")) {
+        return "Erreur FFmpeg: " + errorMessage;
+      }
+
+      return errorMessage;
+    }
+
+    return "Erreur inconnue lors de la conversion";
+  }
+
   async openOutputFile(): Promise<void> {
     const result = this.getCurrentResult();
     if (result?.success && result.output_path) {

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=
+Comment=A Tauri App to optimize videos
+Exec=video-optimizer
+StartupWMClass=video-optimizer
+Icon=video-optimizer
+Name=Video Optimizer
+Terminal=false
+Type=Application

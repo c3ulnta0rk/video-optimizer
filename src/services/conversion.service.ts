@@ -81,6 +81,12 @@ export class ConversionService {
 
   constructor(private settingsService: SettingsService) {
     this.setupEventListeners();
+    this.initializeConversionService();
+  }
+
+  private async initializeConversionService(): Promise<void> {
+    // Nettoyer les processus FFmpeg orphelins au démarrage
+    await this.cleanupFfmpegProcesses();
   }
 
   private async setupEventListeners(): Promise<void> {
@@ -207,7 +213,7 @@ export class ConversionService {
     }));
 
     try {
-      const result = await this.startConversion(
+      const result = await this.startConversionWithTimeout(
         queueItem.video,
         queueItem.config,
         queueItem.selectedAudioTracks,
@@ -293,7 +299,7 @@ export class ConversionService {
             currentConvertingVideo: item.video,
           }));
 
-          const result = await this.startConversion(
+          const result = await this.startConversionWithTimeout(
             item.video,
             item.config,
             item.selectedAudioTracks,
@@ -414,6 +420,49 @@ export class ConversionService {
     } catch (error) {
       console.error("Erreur lors de l'arrêt de la conversion:", error);
       return false;
+    }
+  }
+
+  /**
+   * Nettoie tous les processus FFmpeg orphelins
+   */
+  async cleanupFfmpegProcesses(): Promise<void> {
+    try {
+      await invoke("cleanup_ffmpeg_processes");
+      console.log("Processus FFmpeg nettoyés");
+    } catch (error) {
+      console.error("Erreur lors du nettoyage des processus FFmpeg:", error);
+    }
+  }
+
+  /**
+   * Démarre la conversion avec gestion des timeouts
+   */
+  private async startConversionWithTimeout(
+    video: VideoFile,
+    config: OutputFileConfig,
+    selectedAudioTracks: number[],
+    selectedSubtitleTracks: number[],
+    outputFilename?: string,
+    customOutputPath?: string | null,
+    movieMetadata?: MovieMetadata
+  ): Promise<ConversionResult> {
+    try {
+      return await this.startConversion(
+        video,
+        config,
+        selectedAudioTracks,
+        selectedSubtitleTracks,
+        outputFilename,
+        customOutputPath,
+        movieMetadata
+      );
+    } catch (error) {
+      // En cas d'erreur de timeout de progression, essayer de nettoyer les processus
+      if (error instanceof Error && error.message.includes("timeout")) {
+        await this.cleanupFfmpegProcesses();
+      }
+      throw error;
     }
   }
 

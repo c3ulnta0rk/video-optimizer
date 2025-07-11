@@ -1,0 +1,57 @@
+id: xyz.c3ulnta0rk.video_optimizer
+
+runtime: org.gnome.Platform
+runtime-version: "46"
+sdk: org.gnome.Sdk
+
+command: video-optimizer
+finish-args:
+  - --socket=wayland # Permission needed to show the window
+  - --socket=fallback-x11 # Permission needed to show the window
+  - --device=dri # OpenGL, not necessary for all projects
+  - --share=ipc
+  - --talk-name=org.kde.StatusNotifierWatcher # Optional: needed only if your app uses the tray icon
+  - --filesystem=xdg-run/tray-icon:create # Optional: needed only if your app uses the tray icon - see an alternative way below
+  # - --env=WEBKIT_DISABLE_COMPOSITING_MODE=1 # Optional: may solve some issues with black webviews on Wayland
+
+modules:
+  - name: binary
+    buildsystem: simple
+
+    sources:
+      # A reference to the previously generated flatpak metainfo file
+      - type: file
+        path: flatpak.metainfo.xml
+      # If you use GitHub releases, you can target an existing remote file
+      # - type: file
+      #   url: https://github.com/c3ulnta0rk/video-optimizer/releases/download/v0.1.2/video-optimizer_0.1.2_amd64.deb
+      #   sha256: 08305b5521e2cf0622e084f2b8f7f31f8a989fc7f407a7050fa3649facd61469 # This is required if you are using a remote source
+      #   only-arches: [x86_64] # This source is only used on x86_64 Computers
+      # You can also use a local file for testing
+      - type: file
+        path: /home/kroenen/Documents/Programmes/converter-optimizer-video/bundles/deb/Video Optimizer_0.1.2_amd64.deb
+    build-commands:
+      - set -e
+
+      # Extract the deb package
+      - mkdir deb-extract
+      - ar -x *.deb --output deb-extract
+      - tar -C deb-extract -xf deb-extract/data.tar.gz
+
+      # Copy binary
+      - "install -Dm755 deb-extract/usr/bin/video-optimizer /app/bin/video-optimizer"
+
+      # If you bundle files with additional resources, you should copy them:
+      # - mkdir -p /app/lib/video-optimizer
+      # - cp -r deb-extract/usr/lib/video-optimizer/. /app/lib/video-optimizer
+      # - find /app/lib/video-optimizer -type f -exec chmod 644 {} \;
+
+      # Copy desktop file + ensure the right icon is set
+      # - sed -i 's/^Icon=.*/Icon=xyz.c3ulnta0rk.video_optimizer/' deb-extract/usr/share/applications/video-optimizer.desktop
+      # - install -Dm644 deb-extract/usr/share/applications/video-optimizer.desktop /app/share/applications/xyz.c3ulnta0rk.video_optimizer.desktop
+
+      # Copy icons
+      - install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/video-optimizer.png /app/share/icons/hicolor/128x128/apps/xyz.c3ulnta0rk.video_optimizer.png
+      - install -Dm644 deb-extract/usr/share/icons/hicolor/32x32/apps/video-optimizer.png /app/share/icons/hicolor/32x32/apps/xyz.c3ulnta0rk.video_optimizer.png
+      # - install -Dm644 deb-extract/usr/share/icons/hicolor/256x256@2/apps/video-optimizer.png /app/share/icons/hicolor/256x256@2/apps/xyz.c3ulnta0rk.video_optimizer.png
+      - install -Dm644 flatpak.metainfo.xml /app/share/metainfo/xyz.c3ulnta0rk.video_optimizer.metainfo.xml

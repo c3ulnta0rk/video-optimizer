@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+
+Name=Video Optimizer
+Comment=Easily optimize and convert your videos
+Categories=AudioVideo;Recorder;
+
+Icon=video-optimizer128x128.png
+Exec=video-optimizer
+Terminal=false
