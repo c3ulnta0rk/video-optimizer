@@ -12,6 +12,7 @@ import { MatIconModule } from "@angular/material/icon";
 import { MatButtonModule } from "@angular/material/button";
 import { MatTooltipModule } from "@angular/material/tooltip";
 import { MatDialog, MatDialogModule } from "@angular/material/dialog";
+import { MatSnackBarModule } from "@angular/material/snack-bar";
 import { VideosTableComponent } from "../components/videos-table/videos-table.component";
 import { SettingsDialogComponent } from "../components/settings-dialog/settings-dialog.component";
 import { AdvancedAppbarComponent } from "../components/advanced-appbar/advanced-appbar.component";
@@ -30,6 +31,7 @@ import { SettingsService } from "../services/settings.service";
     MatButtonModule,
     MatTooltipModule,
     MatDialogModule,
+    MatSnackBarModule,
     VideosTableComponent,
     AdvancedAppbarComponent,
   ],

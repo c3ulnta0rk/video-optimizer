@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { VideoFile, AudioTrack, SubtitleTrack } from "./files-manager.service";
 import { OutputFileConfig } from "./filename-generator.service";
 import { SettingsService } from "./settings.service";
+import { NotificationService } from "./notification.service";
 
 export interface MovieMetadata {
   title: string;
@@ -79,7 +80,10 @@ export class ConversionService {
 
   public readonly conversionState = this._conversionState.asReadonly();
 
-  constructor(private settingsService: SettingsService) {
+  constructor(
+    private settingsService: SettingsService,
+    private notificationService: NotificationService
+  ) {
     this.setupEventListeners();
     this.initializeConversionService();
   }
@@ -136,9 +140,14 @@ export class ConversionService {
     });
 
     if (result.success) {
-      console.log("Conversion réussie:", result.output_path);
+      this.notificationService.showSuccess(
+        `Conversion terminée avec succès ! Fichier sauvegardé : ${this.getFileName(result.output_path!)}`
+      );
     } else {
-      console.error("Échec de la conversion:", result.error);
+      this.notificationService.showError(
+        `Échec de la conversion : ${this.getReadableErrorMessage(result.error)}`,
+        { showSystemNotification: true }
+      );
     }
 
     return result;
@@ -200,7 +209,9 @@ export class ConversionService {
     const queueItem = state.queue.find((item) => item.video.path === videoPath);
 
     if (!queueItem) {
-      console.error("Vidéo non trouvée dans la file d'attente");
+      this.notificationService.showError(
+        "Impossible de mettre à jour la progression : vidéo non trouvée dans la file d'attente"
+      );
       return;
     }
 
@@ -256,7 +267,9 @@ export class ConversionService {
 
     // Vérifier si une conversion est déjà en cours
     if (state.isQueueProcessing) {
-      console.log("Une conversion est déjà en cours, veuillez attendre");
+      this.notificationService.showWarning(
+        "Une conversion est déjà en cours, veuillez attendre qu'elle se termine"
+      );
       return;
     }
 
@@ -267,12 +280,14 @@ export class ConversionService {
     );
 
     if (pendingItems.length === 0) {
-      console.log("Aucune vidéo sélectionnée pour la conversion");
+      this.notificationService.showWarning(
+        "Aucune vidéo en attente de conversion"
+      );
       return;
     }
 
-    console.log(
-      `Démarrage de la conversion séquentielle de ${pendingItems.length} vidéos`
+    this.notificationService.showInfo(
+      `Démarrage de la conversion de ${pendingItems.length} vidéo${pendingItems.length > 1 ? 's' : ''}`
     );
 
     // Marquer que le traitement de la file d'attente a commencé
@@ -286,7 +301,7 @@ export class ConversionService {
       for (const item of pendingItems) {
         // Vérifier si on a été interrompu
         if (!this._conversionState().isQueueProcessing) {
-          console.log("Traitement de la file d'attente interrompu");
+          this.notificationService.showInfo("Conversions arrêtées");
           break;
         }
 
@@ -418,7 +433,11 @@ export class ConversionService {
 
       return result;
     } catch (error) {
-      console.error("Erreur lors de l'arrêt de la conversion:", error);
+      this.notificationService.showErrorWithDetails(
+        "Impossible d'arrêter la conversion en cours",
+        error,
+        { action: "Réessayer" }
+      );
       return false;
     }
   }
@@ -429,9 +448,12 @@ export class ConversionService {
   async cleanupFfmpegProcesses(): Promise<void> {
     try {
       await invoke("cleanup_ffmpeg_processes");
-      console.log("Processus FFmpeg nettoyés");
+      this.notificationService.showInfo("Processus FFmpeg nettoyés");
     } catch (error) {
-      console.error("Erreur lors du nettoyage des processus FFmpeg:", error);
+      this.notificationService.showErrorWithDetails(
+        "Impossible de nettoyer les processus FFmpeg",
+        error
+      );
     }
   }
 
@@ -505,7 +527,11 @@ export class ConversionService {
 
       return result;
     } catch (error) {
-      console.error("Erreur lors de l'arrêt des conversions:", error);
+      this.notificationService.showErrorWithDetails(
+        "Impossible d'arrêter toutes les conversions",
+        error,
+        { action: "Réessayer" }
+      );
       return false;
     }
   }
@@ -529,6 +555,43 @@ export class ConversionService {
    */
   getCurrentConvertingVideo(): VideoFile | null {
     return this._conversionState().currentConvertingVideo;
+  }
+
+  /**
+   * Méthodes utilitaires pour les messages d'erreur
+   */
+  private getFileName(filePath: string): string {
+    return filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
+  }
+
+  private getReadableErrorMessage(error?: string): string {
+    if (!error) return "Erreur inconnue";
+    
+    // Messages d'erreur spécifiques et conviviaux
+    if (error.includes("Permission denied") || error.includes("Access denied")) {
+      return "Accès refusé - Vérifiez les permissions du fichier";
+    }
+    if (error.includes("No such file")) {
+      return "Fichier introuvable - Le fichier a peut-être été déplacé ou supprimé";
+    }
+    if (error.includes("No space left")) {
+      return "Espace disque insuffisant pour terminer la conversion";
+    }
+    if (error.includes("ffmpeg") && error.includes("not found")) {
+      return "FFmpeg n'est pas installé ou accessible";
+    }
+    if (error.includes("Invalid") && error.includes("codec")) {
+      return "Codec non supporté - Essayez un autre format de sortie";
+    }
+    if (error.includes("timeout")) {
+      return "La conversion a pris trop de temps et a été interrompue";
+    }
+    if (error.includes("Conversion was cancelled")) {
+      return "Conversion annulée par l'utilisateur";
+    }
+    
+    // Limiter la longueur du message d'erreur
+    return error.length > 100 ? `${error.substring(0, 100)}...` : error;
   }
 
   /**

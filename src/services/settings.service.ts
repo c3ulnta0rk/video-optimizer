@@ -1,7 +1,8 @@
-import { Injectable } from "@angular/core";
+import { Injectable, inject } from "@angular/core";
 import { BehaviorSubject, Observable } from "rxjs";
 import { Store, load } from "@tauri-apps/plugin-store";
 import { OutputFileConfig } from "./filename-generator.service";
+import { NotificationService } from "./notification.service";
 
 export interface AppSettings {
   tmdbApiKey: string;
@@ -21,6 +22,8 @@ export class SettingsService {
   public settings$ = this.settingsSubject.asObservable();
   private store: Store | null = null;
 
+  private readonly notificationService = inject(NotificationService);
+
   constructor() {
     this.initializeStore();
   }
@@ -30,7 +33,10 @@ export class SettingsService {
       this.store = await load(".settings.dat");
       await this.loadSettings();
     } catch (error) {
-      console.error("Error initializing store:", error);
+      this.notificationService.showErrorWithDetails(
+        "Impossible d'initialiser les paramètres, utilisation des valeurs par défaut",
+        error
+      );
       // Fallback to default settings if store fails to initialize
       this.settingsSubject.next(this.getDefaultSettings());
     }
@@ -55,7 +61,9 @@ export class SettingsService {
   private async loadSettings(): Promise<void> {
     try {
       if (!this.store) {
-        console.warn("Store not initialized, using default settings");
+        this.notificationService.showWarning(
+          "Stockage des paramètres non initialisé, utilisation des valeurs par défaut"
+        );
         return;
       }
 
@@ -67,7 +75,10 @@ export class SettingsService {
         });
       }
     } catch (error) {
-      console.error("Error loading settings:", error);
+      this.notificationService.showErrorWithDetails(
+        "Impossible de charger les paramètres, utilisation des valeurs par défaut",
+        error
+      );
       // Use default settings on error
       this.settingsSubject.next(this.getDefaultSettings());
     }
@@ -76,7 +87,9 @@ export class SettingsService {
   private async saveSettings(settings: AppSettings): Promise<void> {
     try {
       if (!this.store) {
-        console.warn("Store not initialized, settings not saved");
+        this.notificationService.showWarning(
+          "Impossible de sauvegarder les paramètres : stockage non initialisé"
+        );
         return;
       }
 
@@ -84,7 +97,11 @@ export class SettingsService {
       await this.store.save();
       this.settingsSubject.next(settings);
     } catch (error) {
-      console.error("Error saving settings:", error);
+      this.notificationService.showErrorWithDetails(
+        "Impossible de sauvegarder les paramètres",
+        error,
+        { action: "Réessayer" }
+      );
     }
   }
 

@@ -3,6 +3,9 @@
 @use "@angular/material" as mat;
 @use "tailwindcss";
 
+// Import des styles de notification
+@import "styles/notifications";
+
 // Variables CSS pour les thèmes
 :root {
   // Light theme variables

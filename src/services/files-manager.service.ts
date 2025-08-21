@@ -15,6 +15,7 @@ import {
   ManualSearchData,
 } from "../components/manual-search-dialog/manual-search-dialog.component";
 import { firstValueFrom, Observable, of, tap } from "rxjs";
+import { NotificationService } from "./notification.service";
 
 export interface AudioTrack {
   index: number;
@@ -65,6 +66,7 @@ export class FilesManagerService {
   private readonly movieParser = inject(MovieTitleParserService);
   private readonly dialog = inject(MatDialog);
   private readonly ffmpegService = inject(FfmpegFormatsService);
+  private readonly notificationService = inject(NotificationService);
 
   // Cache pour les métadonnées et informations de films
   private metadataCache = new Map<string, Partial<VideoFile>>();
@@ -280,8 +282,8 @@ export class FilesManagerService {
           });
           return { path, size: info.size };
         } catch (error) {
-          console.error(
-            `Erreur lors de la récupération de la taille pour ${path}:`,
+          this.notificationService.showErrorWithDetails(
+            `Impossible de récupérer la taille du fichier ${this.getFileName(path)}`,
             error
           );
           return { path, size: 0 };
@@ -403,8 +405,9 @@ export class FilesManagerService {
         loading: false,
       });
     } catch (error) {
-      console.error(
-        `Erreur lors du chargement des métadonnées pour ${filePath}:`,
+      const fileName = this.getFileName(filePath);
+      this.notificationService.showErrorWithDetails(
+        `Impossible de charger les métadonnées de ${fileName}`,
         error
       );
 
@@ -454,7 +457,10 @@ export class FilesManagerService {
     try {
       return await invoke<boolean>("check_ffprobe_available");
     } catch (error) {
-      console.error("Erreur lors de la vérification de ffprobe:", error);
+      this.notificationService.showErrorWithDetails(
+        "Impossible de vérifier la disponibilité de FFprobe",
+        error
+      );
       return false;
     }
   }
@@ -499,7 +505,10 @@ export class FilesManagerService {
         this.movieParser.searchMovieWithAlternatives(fileName)
       );
 
-      console.log("Movie search result:", searchResult);
+      // Log pour debug uniquement en mode développement
+      if (typeof window !== 'undefined' && (window as any)['__DEV__']) {
+        console.log("Movie search result:", searchResult);
+      }
 
       // Si il y a des alternatives, on pourra ouvrir le dialogue plus tard
       // Pour l'instant, on utilise le film sélectionné par défaut
@@ -522,7 +531,10 @@ export class FilesManagerService {
       };
       this.videoFiles.set(finalFiles);
     } catch (error) {
-      console.error("Erreur lors du chargement des infos du film:", error);
+      this.notificationService.showErrorWithDetails(
+        "Impossible de charger les informations des films",
+        error
+      );
 
       // Marquer comme terminé même en cas d'erreur
       const errorFiles = [...this.videoFiles()];
@@ -690,6 +702,13 @@ export class FilesManagerService {
       } as ManualSearchData,
     });
 
-    return dialogRef.afterClosed().pipe(tap(console.log));
+    return dialogRef.afterClosed();
+  }
+
+  /**
+   * Méthode utilitaire pour extraire le nom de fichier d'un chemin
+   */
+  private getFileName(filePath: string): string {
+    return filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
   }
 }

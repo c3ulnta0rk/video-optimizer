@@ -1,0 +1,52 @@
+// Styles pour les notifications
+.success-snackbar {
+  background-color: #4caf50 !important;
+  color: white !important;
+  
+  .mdc-snackbar__label {
+    color: white !important;
+  }
+  
+  .mdc-snackbar__action {
+    color: #e8f5e8 !important;
+  }
+}
+
+.error-snackbar {
+  background-color: #f44336 !important;
+  color: white !important;
+  
+  .mdc-snackbar__label {
+    color: white !important;
+  }
+  
+  .mdc-snackbar__action {
+    color: #ffebee !important;
+  }
+}
+
+.warning-snackbar {
+  background-color: #ff9800 !important;
+  color: white !important;
+  
+  .mdc-snackbar__label {
+    color: white !important;
+  }
+  
+  .mdc-snackbar__action {
+    color: #fff3e0 !important;
+  }
+}
+
+.info-snackbar {
+  background-color: #2196f3 !important;
+  color: white !important;
+  
+  .mdc-snackbar__label {
+    color: white !important;
+  }
+  
+  .mdc-snackbar__action {
+    color: #e3f2fd !important;
+  }
+}
