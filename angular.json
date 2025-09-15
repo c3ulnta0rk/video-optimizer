@@ -72,10 +72,7 @@
           "builder": "@angular/build:karma",
           "options": {
             "tsConfig": "tsconfig.spec.json",
-            "karmaConfig": "karma.conf.js",
-            "polyfills": [
-              "src/polyfills.ts"
-            ]
+            "karmaConfig": "karma.conf.js"
           }
         }
       }
