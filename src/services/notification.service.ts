@@ -19,7 +19,7 @@ export interface NotificationOptions {
   providedIn: 'root'
 })
 export class NotificationService {
-  private readonly snackBar = inject(MatSnackBar);
+  constructor(private readonly snackBar: MatSnackBar) {}
 
   private readonly defaultDurations = {
     [NotificationType.SUCCESS]: 4000,

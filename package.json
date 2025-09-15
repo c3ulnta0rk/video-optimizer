@@ -8,7 +8,11 @@
     "watch": "ng build --watch --configuration development",
     "tauri": "tauri",
     "build:prod": "ng build --configuration production",
-    "build:appimage": "npm run build:prod && tauri build --target appimage"
+    "build:appimage": "npm run build:prod && tauri build --target appimage",
+    "test": "ng test",
+    "test:watch": "ng test --watch",
+    "test:coverage": "ng test --code-coverage",
+    "test:ci": "ng test --browsers=ChromeHeadlessCI --watch=false --code-coverage"
   },
   "private": true,
   "dependencies": {
@@ -39,6 +43,7 @@
     "zone.js": "~0.15.1"
   },
   "devDependencies": {
+    "@angular-devkit/build-angular": "^20.0.5",
     "@angular/build": "^20.0.5",
     "@angular/cli": "^20.0.5",
     "@angular/compiler-cli": "^20.0.6",

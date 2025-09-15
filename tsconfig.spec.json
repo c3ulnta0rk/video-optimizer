@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec",
+    "target": "ES2022",
+    "types": [
+      "jasmine",
+      "node"
+    ],
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/**/*.spec.ts",
+    "src/**/*.d.ts",
+    "src/test.ts",
+    "src/polyfills.ts"
+  ],
+  "files": [
+    "src/test.ts",
+    "src/polyfills.ts"
+  ]
+}

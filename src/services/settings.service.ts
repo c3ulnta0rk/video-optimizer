@@ -1,5 +1,5 @@
 import { Injectable, inject } from "@angular/core";
-import { BehaviorSubject, Observable } from "rxjs";
+import { BehaviorSubject } from "rxjs";
 import { Store, load } from "@tauri-apps/plugin-store";
 import { OutputFileConfig } from "./filename-generator.service";
 import { NotificationService } from "./notification.service";
