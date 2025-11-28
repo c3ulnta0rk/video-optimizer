@@ -44,6 +44,11 @@ fn generate_filename_command(
     modules::smart_renamer::generate_filename(&metadata, movie_info.as_ref(), &template)
 }
 
+#[tauri::command]
+fn get_gpu_capabilities_command() -> modules::gpu_detector::GpuCapabilities {
+    modules::gpu_detector::check_gpu_availability()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -84,7 +89,8 @@ pub fn run() {
             get_video_metadata,
             convert_video_command,
             search_movie_command,
-            generate_filename_command
+            generate_filename_command,
+            get_gpu_capabilities_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

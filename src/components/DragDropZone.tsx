@@ -3,16 +3,58 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileVideo } from 'lucide-react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { open } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
 import { VideoList } from './VideoList';
-
-interface FileItem {
-    name: string;
-    path: string;
-}
+import { useVideoStore, FileItem } from '../store/videoStore';
 
 export const DragDropZone: React.FC = () => {
     const [isDragging, setIsDragging] = useState(false);
-    const [files, setFiles] = useState<FileItem[]>([]);
+    const addFiles = useVideoStore((state) => state.addFiles);
+
+    const processFiles = async (paths: string[]) => {
+        const newFiles: FileItem[] = [];
+
+        for (const path of paths) {
+            try {
+                // Fetch metadata for duration
+                const metadata: any = await invoke('get_video_metadata', { filePath: path });
+
+                // Format size
+                const sizeBytes = metadata.size || 0;
+                const sizeFormatted = sizeBytes > 1024 * 1024 * 1024
+                    ? `${(sizeBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                    : `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`;
+
+                newFiles.push({
+                    id: crypto.randomUUID(),
+                    name: path.split('/').pop() || path,
+                    path: path,
+                    size: sizeFormatted,
+                    duration: metadata.duration || 0,
+                    progress: 0,
+                    status: 'idle',
+                    metadata: metadata
+                });
+            } catch (error) {
+                console.error(`Failed to get metadata for ${path}:`, error);
+                // Add anyway with default values? Or skip?
+                // Let's add with error status or default
+                newFiles.push({
+                    id: crypto.randomUUID(),
+                    name: path.split('/').pop() || path,
+                    path: path,
+                    size: "Unknown",
+                    duration: 0,
+                    progress: 0,
+                    status: 'error',
+                });
+            }
+        }
+
+        if (newFiles.length > 0) {
+            addFiles(newFiles);
+        }
+    };
 
     // Setup Tauri file drop listener
     React.useEffect(() => {
@@ -21,11 +63,7 @@ export const DragDropZone: React.FC = () => {
                 setIsDragging(true);
             } else if (event.payload.type === 'drop') {
                 setIsDragging(false);
-                const newFiles = event.payload.paths.map((path) => ({
-                    name: path.split('/').pop() || path,
-                    path: path,
-                }));
-                setFiles((prev) => [...prev, ...newFiles]);
+                processFiles(event.payload.paths);
             } else {
                 setIsDragging(false);
             }
@@ -47,16 +85,8 @@ export const DragDropZone: React.FC = () => {
 
         if (selected) {
             const paths = Array.isArray(selected) ? selected : [selected];
-            const newFiles = paths.map((path) => ({
-                name: path.split('/').pop() || path,
-                path: path,
-            }));
-            setFiles((prev) => [...prev, ...newFiles]);
+            processFiles(paths);
         }
-    };
-
-    const removeFile = (index: number) => {
-        setFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
     return (
@@ -109,7 +139,7 @@ export const DragDropZone: React.FC = () => {
                 </div>
             </motion.div>
 
-            <VideoList files={files} onRemove={removeFile} />
+            <VideoList />
         </div>
     );
 };

@@ -25,9 +25,13 @@ pub struct VideoMetadata {
     pub video_codec: String,
     pub audio_streams: Vec<AudioStream>,
     pub subtitle_streams: Vec<SubtitleStream>,
+    pub size: u64, // Added size field
 }
 
 pub fn extract_metadata(file_path: &str) -> Result<VideoMetadata, String> {
+    // Fetch file size
+    let size = std::fs::metadata(file_path).map(|m| m.len()).unwrap_or(0);
+
     let output = Command::new("ffprobe")
         .args(&[
             "-v",
@@ -97,6 +101,8 @@ pub fn extract_metadata(file_path: &str) -> Result<VideoMetadata, String> {
                     codec_name,
                     language,
                 });
+                // Note: SubtitleStream definition above doesn't have channels, so we are good.
+                // Wait, I need to check SubtitleStream definition again.
             }
         }
     }
@@ -109,5 +115,6 @@ pub fn extract_metadata(file_path: &str) -> Result<VideoMetadata, String> {
         video_codec,
         audio_streams,
         subtitle_streams,
+        size,
     })
 }
