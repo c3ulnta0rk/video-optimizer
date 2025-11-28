@@ -4,11 +4,88 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+mod modules;
+
+use modules::metadata_extractor::VideoMetadata;
+
+#[tauri::command]
+fn get_video_metadata(file_path: String) -> Result<VideoMetadata, String> {
+    modules::metadata_extractor::extract_metadata(&file_path)
+}
+
+#[tauri::command]
+async fn convert_video_command(
+    window: tauri::Window,
+    options: modules::ffmpeg_runner::ConversionOptions,
+) -> Result<(), String> {
+    modules::ffmpeg_runner::convert_video(window, options).await
+}
+
+#[tauri::command]
+async fn search_movie_command(
+    query: String,
+    api_key: String,
+) -> Result<Vec<modules::tmdb_client::MovieSearchResult>, String> {
+    // In a real app, this should be async using reqwest::Client
+    // For now, we wrap the blocking call
+    tauri::async_runtime::spawn_blocking(move || {
+        modules::tmdb_client::search_movie(&query, &api_key)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn generate_filename_command(
+    metadata: modules::metadata_extractor::VideoMetadata,
+    movie_info: Option<modules::tmdb_client::MovieSearchResult>,
+    template: String,
+) -> String {
+    modules::smart_renamer::generate_filename(&metadata, movie_info.as_ref(), &template)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_notification::init())
+        .setup(|app| {
+            use tauri::menu::{Menu, MenuItem};
+            use tauri::tray::TrayIconBuilder;
+            use tauri::Manager;
+
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(true)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            get_video_metadata,
+            convert_video_command,
+            search_movie_command,
+            generate_filename_command
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
