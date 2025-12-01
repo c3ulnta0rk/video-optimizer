@@ -476,7 +476,12 @@ export const VideoList: React.FC = () => {
                                                         onClick={async () => {
                                                             try {
                                                                 const cleanName = await invoke<string>('clean_filename_command', { filename: file.name });
-                                                                updateFileSettings(file.id, { outputName: cleanName });
+                                                                // cleanName comes with .mp4 by default from backend. 
+                                                                // We need to ensure it matches the current container.
+                                                                const currentContainer = file.conversionSettings?.container || availablePresets.find(p => p.id === defaultPresetId)?.container || 'mp4';
+                                                                const finalName = cleanName.replace(/\.mp4$/, `.${currentContainer}`);
+
+                                                                updateFileSettings(file.id, { outputName: finalName });
                                                             } catch (e) {
                                                                 console.error("Failed to clean filename", e);
                                                             }
@@ -541,10 +546,14 @@ export const VideoList: React.FC = () => {
                 onSelect={(movie) => {
                     if (searchDialogState.fileId) {
                         const fileId = searchDialogState.fileId;
+                        const file = files.find(f => f.id === fileId);
 
                         const year = movie.release_date?.split('-')[0] || '';
                         const cleanTitle = movie.title.replace(/[:/\\?*|"><]/g, ''); // Remove illegal chars
-                        const newName = `${cleanTitle} (${year}).mp4`;
+
+                        // Determine container
+                        const currentContainer = file?.conversionSettings?.container || availablePresets.find(p => p.id === defaultPresetId)?.container || 'mp4';
+                        const newName = `${cleanTitle} (${year}).${currentContainer}`;
 
                         updateFileSettings(fileId, { outputName: newName });
 
