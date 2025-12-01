@@ -1,30 +1,97 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileVideo, Trash2, Play, Settings as SettingsIcon } from 'lucide-react';
-import { ProgressChart } from './ProgressChart';
+import { FileVideo, Trash2, Play, Settings as SettingsIcon, FolderOpen, Wand2, Search, Square } from 'lucide-react';
 import { useVideoStore } from '../store/videoStore';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { open } from '@tauri-apps/plugin-dialog';
 import { Store } from '@tauri-apps/plugin-store';
+import { MetadataSearchDialog } from './MetadataSearchDialog';
 
 export const VideoList: React.FC = () => {
-    const { files, removeFile, updateStatus, updateFileSettings } = useVideoStore();
+    const { files, removeFile, updateStatus, updateFileSettings, updateMetadata, updateProgress } = useVideoStore();
     const [expandedFileId, setExpandedFileId] = React.useState<string | null>(null);
+    const [conversionDetails, setConversionDetails] = React.useState<Record<string, { fps: number, time: string, speed: string }>>({});
+
+    // Metadata Search State
+    const [searchDialogState, setSearchDialogState] = React.useState<{ isOpen: boolean, fileId: string | null, query: string }>({
+        isOpen: false,
+        fileId: null,
+        query: ''
+    });
+
+    React.useEffect(() => {
+        const unlisten = getCurrentWebview().listen('conversion_progress', (event: any) => {
+            const payload = event.payload;
+            // payload: { id, frame, fps, time, bitrate, speed, progress }
+            if (payload.id) {
+                updateProgress(payload.id, payload.progress);
+                setConversionDetails(prev => ({
+                    ...prev,
+                    [payload.id]: {
+                        fps: payload.fps,
+                        time: payload.time,
+                        speed: payload.speed
+                    }
+                }));
+            }
+        });
+
+        return () => {
+            unlisten.then(f => f());
+        };
+    }, []);
 
     const startConversion = async () => {
         try {
             const store = await Store.load('settings.json');
             const encoder = await store.get<string>('default_encoder') || 'libx264';
+            const globalOutputDir = await store.get<string>('default_output_dir');
 
             for (const file of files) {
                 if (file.status === 'idle') {
                     updateStatus(file.id, 'converting');
 
-                    // Construct output path (simple append for now)
-                    // TODO: Use Smart Renamer or user defined path
-                    const outputPath = file.path.replace(/(\.[\w\d]+)$/, '_optimized.mp4');
+                    // Determine Output Directory
+                    let outputDir = file.conversionSettings?.outputDir || globalOutputDir;
+
+                    // Construct output path
+                    // If outputDir is set, use it. Otherwise use input file's directory.
+                    let outputPath = '';
+
+                    // Determine filename
+                    let finalFilename = file.conversionSettings?.outputName;
+                    if (!finalFilename) {
+                        const originalName = file.name.replace(/(\.[\w\d]+)$/, ''); // Remove extension
+                        finalFilename = `${originalName}_optimized.mp4`;
+                    }
+                    // Ensure extension
+                    if (!finalFilename.endsWith('.mp4')) {
+                        finalFilename += '.mp4';
+                    }
+
+                    if (outputDir) {
+                        // Ensure no double slashes, simple join
+                        const separator = outputDir.endsWith('/') ? '' : '/';
+                        outputPath = `${outputDir}${separator}${finalFilename}`;
+                    } else {
+                        // Same directory as input
+                        // We need to construct the full path carefully if we are just replacing the filename in the original path
+                        // But since we have the full input path, we can extract the dir
+                        // Actually, easiest is to use the same logic:
+                        // If no outputDir, use the parent dir of input_path
+                        // But in JS getting parent dir from string is regex or split
+
+                        // Wait, file.name might not be exactly the end if path separators differ, but on Linux it should be fine.
+                        // Safer:
+                        const lastSlash = file.path.lastIndexOf('/');
+                        const dir = lastSlash !== -1 ? file.path.substring(0, lastSlash + 1) : './';
+                        outputPath = `${dir}${finalFilename}`;
+                    }
 
                     invoke('convert_video_command', {
                         options: {
+                            id: file.id, // Pass ID
                             input_path: file.path,
                             output_path: outputPath,
                             video_codec: file.conversionSettings?.videoCodec || encoder,
@@ -40,12 +107,23 @@ export const VideoList: React.FC = () => {
                         updateStatus(file.id, 'completed');
                     }).catch((e) => {
                         console.error('Conversion failed', e);
+                        // If cancelled manually, it might throw an error or just exit.
+                        // We might want to handle 'cancelled' status if we add it.
                         updateStatus(file.id, 'error');
                     });
                 }
             }
         } catch (e) {
             console.error('Failed to start conversion', e);
+        }
+    };
+
+    const stopConversion = async (id: string) => {
+        try {
+            await invoke('cancel_conversion_command', { id });
+            updateStatus(id, 'idle'); // Reset to idle or 'cancelled'
+        } catch (e) {
+            console.error('Failed to stop conversion', e);
         }
     };
 
@@ -78,21 +156,48 @@ export const VideoList: React.FC = () => {
                     >
                         <div className="p-4">
                             <div className="flex items-center gap-4">
-                                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                    <FileVideo className="h-6 w-6" />
-                                    {file.progress > 0 && file.progress < 100 && (
-                                        <div className="absolute inset-0">
-                                            <ProgressChart progress={file.progress} size={48} strokeWidth={3} />
+                                <div className="relative w-12 h-16 bg-muted rounded overflow-hidden flex-shrink-0 group">
+                                    {file.posterPath ? (
+                                        <img src={`https://image.tmdb.org/t/p/w200${file.posterPath}`} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <FileVideo className="w-6 h-6 text-muted-foreground" />
                                         </div>
                                     )}
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSearchDialogState({
+                                                isOpen: true,
+                                                fileId: file.id,
+                                                query: file.name.replace(/(\.[\w\d]+)$/, '').replace(/[._]/g, ' ')
+                                            });
+                                        }}
+                                    >
+                                        <Search className="w-4 h-4 text-white" />
+                                    </div>
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <h4 className="font-medium truncate pr-4" title={file.name}>
-                                            {file.name}
-                                        </h4>
-                                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="space-y-0.5">
+                                            <h3 className="font-medium truncate pr-4" title={file.name}>
+                                                {file.name}
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground font-mono truncate">
+                                                {file.path}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {file.status === 'converting' && (
+                                                <button
+                                                    onClick={() => stopConversion(file.id)}
+                                                    className="p-2 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                                    title="Stop Conversion"
+                                                >
+                                                    <Square className="h-4 w-4 fill-current" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => setExpandedFileId(expandedFileId === file.id ? null : file.id)}
                                                 className={`p-2 rounded-full hover:bg-secondary transition-colors ${expandedFileId === file.id ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
@@ -127,6 +232,11 @@ export const VideoList: React.FC = () => {
                                         {file.conversionSettings && (
                                             <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                                                 Custom
+                                            </span>
+                                        )}
+                                        {file.status === 'converting' && conversionDetails[file.id] && (
+                                            <span className="text-[10px] text-primary animate-pulse">
+                                                {conversionDetails[file.id].speed}x | {conversionDetails[file.id].fps} fps
                                             </span>
                                         )}
                                     </div>
@@ -181,24 +291,114 @@ export const VideoList: React.FC = () => {
                                                     <option value="copy_all">Copy All</option>
                                                 </select>
                                             </div>
+                                            <div className="col-span-2 space-y-1">
+                                                <label className="text-xs font-medium text-muted-foreground">Output Filename</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={file.conversionSettings?.outputName || ''}
+                                                        onChange={(e) => updateFileSettings(file.id, { outputName: e.target.value })}
+                                                        placeholder={`${file.name.replace(/(\.[\w\d]+)$/, '')}_optimized.mp4`}
+                                                        className="flex-1 px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                                    />
+                                                    <button
+                                                        onClick={async () => {
+                                                            try {
+                                                                const cleanName = await invoke<string>('clean_filename_command', { filename: file.name });
+                                                                updateFileSettings(file.id, { outputName: cleanName });
+                                                            } catch (e) {
+                                                                console.error("Failed to clean filename", e);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 rounded-md border hover:bg-primary/10 hover:text-primary transition-colors"
+                                                        title="Auto-Rename (Smart Clean)"
+                                                    >
+                                                        <Wand2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="col-span-2 space-y-1">
+                                                <label className="text-xs font-medium text-muted-foreground">Output Directory</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={file.conversionSettings?.outputDir || ''}
+                                                        readOnly
+                                                        placeholder="Global Default (or Input Dir)"
+                                                        className="flex-1 px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                                    />
+                                                    <button
+                                                        onClick={async () => {
+                                                            const selected = await open({
+                                                                directory: true,
+                                                                multiple: false,
+                                                                defaultPath: file.conversionSettings?.outputDir || undefined
+                                                            });
+                                                            if (selected && typeof selected === 'string') {
+                                                                updateFileSettings(file.id, { outputDir: selected });
+                                                            }
+                                                        }}
+                                                        className="p-1.5 rounded-md border hover:bg-muted transition-colors"
+                                                        title="Select Folder"
+                                                    >
+                                                        <FolderOpen className="w-4 h-4" />
+                                                    </button>
+                                                    {file.conversionSettings?.outputDir && (
+                                                        <button
+                                                            onClick={() => updateFileSettings(file.id, { outputDir: undefined })}
+                                                            className="p-1.5 rounded-md border hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                                            title="Clear (Use Default)"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
-                        </div>
-                    </motion.div>
+                        </div >
+                    </motion.div >
                 ))}
-            </AnimatePresence>
+            </AnimatePresence >
 
-            {files.length === 0 && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-center text-muted-foreground py-8"
-                >
-                    No videos added yet
-                </motion.div>
-            )}
-        </div>
+            <MetadataSearchDialog
+                isOpen={searchDialogState.isOpen}
+                onClose={() => setSearchDialogState(prev => ({ ...prev, isOpen: false }))}
+                initialQuery={searchDialogState.query}
+                onSelect={(movie) => {
+                    if (searchDialogState.fileId) {
+                        const fileId = searchDialogState.fileId;
+
+                        const year = movie.release_date?.split('-')[0] || '';
+                        const cleanTitle = movie.title.replace(/[:/\\?*|"><]/g, ''); // Remove illegal chars
+                        const newName = `${cleanTitle} (${year}).mp4`;
+
+                        updateFileSettings(fileId, { outputName: newName });
+
+                        updateMetadata(fileId, {
+                            tmdbId: movie.id,
+                            posterPath: movie.poster_path,
+                            overview: movie.overview,
+                            releaseDate: movie.release_date
+                        });
+                    }
+                    setSearchDialogState(prev => ({ ...prev, isOpen: false }));
+                }}
+            />
+
+            {
+                files.length === 0 && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="text-center text-muted-foreground py-8"
+                    >
+                        No videos added yet
+                    </motion.div>
+                )
+            }
+        </div >
     );
 };
