@@ -8,6 +8,11 @@ export interface ConversionSettingsOverride {
     audioBitrate?: string;
     outputDir?: string;
     outputName?: string;
+    crf?: number;
+    preset?: string;
+    profile?: string;
+    tune?: string;
+    container?: string;
 }
 
 export interface FileItem {

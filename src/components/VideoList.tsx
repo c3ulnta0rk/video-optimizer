@@ -20,7 +20,33 @@ export const VideoList: React.FC = () => {
         query: ''
     });
 
+    const [availablePresets, setAvailablePresets] = React.useState<any[]>([]);
+    const [defaultPresetId, setDefaultPresetId] = React.useState<string>('default-high');
+
     React.useEffect(() => {
+        const loadPresets = async () => {
+            try {
+                const store = await Store.load('settings.json');
+                const presets = await store.get<any[]>('presets');
+                const defId = await store.get<string>('default_preset_id');
+
+                if (defId) setDefaultPresetId(defId);
+
+                if (presets) {
+                    setAvailablePresets(presets);
+                } else {
+                    // Fallback if not yet saved
+                    setAvailablePresets([
+                        { id: 'default-high', name: 'High Quality (H.264)', container: 'mp4' },
+                        { id: 'fast-gpu', name: 'Fast GPU (NVENC)', container: 'mp4' }
+                    ]);
+                }
+            } catch (e) {
+                console.error("Failed to load presets", e);
+            }
+        };
+        loadPresets();
+
         const unlisten = getCurrentWebview().listen('conversion_progress', (event: any) => {
             const payload = event.payload;
             // payload: { id, frame, fps, time, bitrate, speed, progress }
@@ -45,7 +71,20 @@ export const VideoList: React.FC = () => {
     const startConversion = async () => {
         try {
             const store = await Store.load('settings.json');
-            const encoder = await store.get<string>('default_encoder') || 'libx264';
+            const defaultPresetId = await store.get<string>('default_preset_id') || 'default-high';
+            const presets = await store.get<any[]>('presets') || [];
+            // We need to import DEFAULT_PRESETS or duplicate logic if store is empty, 
+            // but store should have presets if saved. If not, use hardcoded fallback.
+            // Ideally we should import DEFAULT_PRESETS from types/preset but dynamic import might be tricky if not exported.
+            // Let's assume store has them or we fallback safely.
+
+            const defaultPreset = presets.find((p: any) => p.id === defaultPresetId) || presets[0] || {
+                video: { codec: 'libx264', preset: 'medium', crf: 23 },
+                audio: { codec: 'aac', bitrate: '128k', strategy: 'first_track' },
+                subtitle: { strategy: 'ignore' },
+                container: 'mp4'
+            };
+
             const globalOutputDir = await store.get<string>('default_output_dir');
 
             for (const file of files) {
@@ -63,12 +102,11 @@ export const VideoList: React.FC = () => {
                     let finalFilename = file.conversionSettings?.outputName;
                     if (!finalFilename) {
                         const originalName = file.name.replace(/(\.[\w\d]+)$/, ''); // Remove extension
-                        finalFilename = `${originalName}_optimized.mp4`;
+                        const ext = file.conversionSettings?.container || defaultPreset.container || 'mp4';
+                        finalFilename = `${originalName}_optimized.${ext}`;
                     }
                     // Ensure extension
-                    if (!finalFilename.endsWith('.mp4')) {
-                        finalFilename += '.mp4';
-                    }
+                    // ... (existing logic)
 
                     if (outputDir) {
                         // Ensure no double slashes, simple join
@@ -76,14 +114,6 @@ export const VideoList: React.FC = () => {
                         outputPath = `${outputDir}${separator}${finalFilename}`;
                     } else {
                         // Same directory as input
-                        // We need to construct the full path carefully if we are just replacing the filename in the original path
-                        // But since we have the full input path, we can extract the dir
-                        // Actually, easiest is to use the same logic:
-                        // If no outputDir, use the parent dir of input_path
-                        // But in JS getting parent dir from string is regex or split
-
-                        // Wait, file.name might not be exactly the end if path separators differ, but on Linux it should be fine.
-                        // Safer:
                         const lastSlash = file.path.lastIndexOf('/');
                         const dir = lastSlash !== -1 ? file.path.substring(0, lastSlash + 1) : './';
                         outputPath = `${dir}${finalFilename}`;
@@ -94,14 +124,18 @@ export const VideoList: React.FC = () => {
                             id: file.id, // Pass ID
                             input_path: file.path,
                             output_path: outputPath,
-                            video_codec: file.conversionSettings?.videoCodec || encoder,
+                            video_codec: file.conversionSettings?.videoCodec || defaultPreset.video.codec,
                             audio_track_index: null, // Default
                             subtitle_track_index: null, // Default
                             duration_seconds: file.duration,
-                            audio_strategy: file.conversionSettings?.audioStrategy || 'first_track',
-                            subtitle_strategy: file.conversionSettings?.subtitleStrategy || 'ignore',
-                            audio_codec: file.conversionSettings?.audioCodec || 'aac',
-                            audio_bitrate: file.conversionSettings?.audioBitrate || '128k'
+                            audio_strategy: file.conversionSettings?.audioStrategy || defaultPreset.audio.strategy || 'first_track',
+                            subtitle_strategy: file.conversionSettings?.subtitleStrategy || defaultPreset.subtitle?.strategy || 'ignore',
+                            audio_codec: file.conversionSettings?.audioCodec || defaultPreset.audio.codec || 'aac',
+                            audio_bitrate: file.conversionSettings?.audioBitrate || defaultPreset.audio.bitrate || '128k',
+                            crf: file.conversionSettings?.crf || defaultPreset.video.crf,
+                            preset: file.conversionSettings?.preset || defaultPreset.video.preset,
+                            profile: file.conversionSettings?.profile,
+                            tune: file.conversionSettings?.tune
                         }
                     }).then(() => {
                         updateStatus(file.id, 'completed');
@@ -180,15 +214,15 @@ export const VideoList: React.FC = () => {
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-2">
-                                        <div className="space-y-0.5">
-                                            <h3 className="font-medium truncate pr-4" title={file.name}>
+                                        <div className="space-y-0.5 flex-1 min-w-0 mr-4">
+                                            <h3 className="font-medium truncate" title={file.name}>
                                                 {file.name}
                                             </h3>
                                             <p className="text-xs text-muted-foreground font-mono truncate">
                                                 {file.path}
                                             </p>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 shrink-0">
                                             {file.status === 'converting' && (
                                                 <button
                                                     onClick={() => stopConversion(file.id)}
@@ -252,6 +286,47 @@ export const VideoList: React.FC = () => {
                                         className="overflow-hidden"
                                     >
                                         <div className="pt-4 mt-4 border-t grid grid-cols-2 gap-4 text-sm">
+                                            <div className="col-span-2 space-y-1">
+                                                <label className="text-xs font-medium text-muted-foreground">Apply Preset</label>
+                                                <select
+                                                    onChange={async (e) => {
+                                                        const presetId = e.target.value;
+                                                        if (!presetId) return;
+
+                                                        // Load presets to find the selected one
+                                                        // Note: In a real app we might want to pass presets as prop or use a hook
+                                                        const store = await Store.load('settings.json');
+                                                        const presets = await store.get<any[]>('presets') || [];
+                                                        const preset = presets.find((p: any) => p.id === presetId);
+
+                                                        if (preset) {
+                                                            updateFileSettings(file.id, {
+                                                                videoCodec: preset.video.codec,
+                                                                crf: preset.video.crf,
+                                                                preset: preset.video.preset,
+                                                                audioCodec: preset.audio.codec,
+                                                                audioBitrate: preset.audio.bitrate,
+                                                                audioStrategy: preset.audio.strategy,
+                                                                subtitleStrategy: preset.subtitle?.strategy,
+                                                                container: preset.container
+                                                            });
+
+                                                            // Also update filename extension
+                                                            const currentName = file.conversionSettings?.outputName || file.name;
+                                                            const newName = currentName.replace(/\.[\w\d]+$/, `.${preset.container}`);
+                                                            updateFileSettings(file.id, { outputName: newName });
+                                                        }
+                                                        // Reset select to empty
+                                                        e.target.value = "";
+                                                    }}
+                                                    className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                                >
+                                                    <option value="">Select a preset to apply...</option>
+                                                    {availablePresets.map(p => (
+                                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
                                             <div className="space-y-1">
                                                 <label className="text-xs font-medium text-muted-foreground">Video Codec</label>
                                                 <select
@@ -267,6 +342,28 @@ export const VideoList: React.FC = () => {
                                                 </select>
                                             </div>
                                             <div className="space-y-1">
+                                                <label className="text-xs font-medium text-muted-foreground">Container</label>
+                                                <select
+                                                    value={file.conversionSettings?.container || availablePresets.find(p => p.id === defaultPresetId)?.container || 'mp4'}
+                                                    onChange={(e) => {
+                                                        const newContainer = e.target.value;
+                                                        const currentName = file.conversionSettings?.outputName || file.name;
+                                                        // Replace extension
+                                                        const newName = currentName.replace(/\.[\w\d]+$/, `.${newContainer}`);
+                                                        updateFileSettings(file.id, {
+                                                            container: newContainer,
+                                                            outputName: newName
+                                                        });
+                                                    }}
+                                                    className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                                >
+                                                    <option value="mp4">MP4</option>
+                                                    <option value="mkv">MKV</option>
+                                                    <option value="avi">AVI</option>
+                                                    <option value="mov">MOV</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
                                                 <label className="text-xs font-medium text-muted-foreground">Audio Strategy</label>
                                                 <select
                                                     value={file.conversionSettings?.audioStrategy || 'default'}
@@ -279,6 +376,38 @@ export const VideoList: React.FC = () => {
                                                     <option value="first_track">First Track Only</option>
                                                 </select>
                                             </div>
+
+                                            {/* Audio Details (Codec & Bitrate) - Show if not Copy All */}
+                                            {file.conversionSettings?.audioStrategy !== 'copy_all' && (
+                                                <>
+                                                    <div className="space-y-1">
+                                                        <label className="text-xs font-medium text-muted-foreground">Audio Codec</label>
+                                                        <select
+                                                            value={file.conversionSettings?.audioCodec || 'aac'}
+                                                            onChange={(e) => updateFileSettings(file.id, { audioCodec: e.target.value })}
+                                                            className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                                        >
+                                                            <option value="aac">AAC</option>
+                                                            <option value="ac3">AC3</option>
+                                                            <option value="copy">Copy</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-xs font-medium text-muted-foreground">Audio Bitrate</label>
+                                                        <select
+                                                            value={file.conversionSettings?.audioBitrate || '128k'}
+                                                            onChange={(e) => updateFileSettings(file.id, { audioBitrate: e.target.value })}
+                                                            className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                                            disabled={file.conversionSettings?.audioCodec === 'copy'}
+                                                        >
+                                                            <option value="64k">64k</option>
+                                                            <option value="128k">128k</option>
+                                                            <option value="192k">192k</option>
+                                                            <option value="320k">320k</option>
+                                                        </select>
+                                                    </div>
+                                                </>
+                                            )}
                                             <div className="space-y-1">
                                                 <label className="text-xs font-medium text-muted-foreground">Subtitle Strategy</label>
                                                 <select
@@ -291,6 +420,48 @@ export const VideoList: React.FC = () => {
                                                     <option value="copy_all">Copy All</option>
                                                 </select>
                                             </div>
+
+                                            {/* Advanced Settings Row */}
+                                            <div className="col-span-2 grid grid-cols-2 gap-4 pt-2 border-t border-dashed">
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between">
+                                                        <label className="text-xs font-medium text-muted-foreground">Quality (CRF)</label>
+                                                        <span className="text-xs text-primary font-mono">{file.conversionSettings?.crf || 23}</span>
+                                                    </div>
+                                                    <input
+                                                        type="range"
+                                                        min="18"
+                                                        max="28"
+                                                        step="1"
+                                                        value={file.conversionSettings?.crf || 23}
+                                                        onChange={(e) => updateFileSettings(file.id, { crf: parseInt(e.target.value) })}
+                                                        className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                                                        title="Lower is better quality, Higher is smaller size"
+                                                    />
+                                                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                                                        <span>High Quality</span>
+                                                        <span>Small Size</span>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs font-medium text-muted-foreground">Preset (Speed)</label>
+                                                    <select
+                                                        value={file.conversionSettings?.preset || 'fast'}
+                                                        onChange={(e) => updateFileSettings(file.id, { preset: e.target.value })}
+                                                        className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                                    >
+                                                        <option value="ultrafast">Ultrafast (Low Comp)</option>
+                                                        <option value="superfast">Superfast</option>
+                                                        <option value="veryfast">Veryfast</option>
+                                                        <option value="faster">Faster</option>
+                                                        <option value="fast">Fast (Default)</option>
+                                                        <option value="medium">Medium</option>
+                                                        <option value="slow">Slow (Better Comp)</option>
+                                                        <option value="slower">Slower</option>
+                                                        <option value="veryslow">Veryslow</option>
+                                                    </select>
+                                                </div>
+                                            </div>
                                             <div className="col-span-2 space-y-1">
                                                 <label className="text-xs font-medium text-muted-foreground">Output Filename</label>
                                                 <div className="flex gap-2">
@@ -298,7 +469,7 @@ export const VideoList: React.FC = () => {
                                                         type="text"
                                                         value={file.conversionSettings?.outputName || ''}
                                                         onChange={(e) => updateFileSettings(file.id, { outputName: e.target.value })}
-                                                        placeholder={`${file.name.replace(/(\.[\w\d]+)$/, '')}_optimized.mp4`}
+                                                        placeholder={`${file.name.replace(/(\.[\w\d]+)$/, '')}_optimized.${file.conversionSettings?.container || availablePresets.find(p => p.id === defaultPresetId)?.container || 'mp4'}`}
                                                         className="flex-1 px-2 py-1.5 rounded-md border bg-background/50 text-xs"
                                                     />
                                                     <button

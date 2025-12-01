@@ -28,7 +28,7 @@ export const SettingsDialog: React.FC = () => {
     // General Settings
     const [apiKey, setApiKey] = useState('');
     const [showApiKey, setShowApiKey] = useState(false);
-    const [defaultEncoder, setDefaultEncoder] = useState('libx264');
+    const [defaultPresetId, setDefaultPresetId] = useState('default-high');
     const [defaultOutputDir, setDefaultOutputDir] = useState('');
 
     // Presets
@@ -54,8 +54,8 @@ export const SettingsDialog: React.FC = () => {
                 const val = await _store.get<string>('tmdb_api_key');
                 if (val) setApiKey(val);
 
-                const encoder = await _store.get<string>('default_encoder');
-                if (encoder) setDefaultEncoder(encoder);
+                const presetId = await _store.get<string>('default_preset_id');
+                if (presetId) setDefaultPresetId(presetId);
 
                 const outputDir = await _store.get<string>('default_output_dir');
                 if (outputDir) setDefaultOutputDir(outputDir);
@@ -82,7 +82,7 @@ export const SettingsDialog: React.FC = () => {
         if (!store) return;
         try {
             await store.set('tmdb_api_key', apiKey);
-            await store.set('default_encoder', defaultEncoder);
+            await store.set('default_preset_id', defaultPresetId);
             await store.set('default_output_dir', defaultOutputDir);
             await store.set('presets', presets);
             await store.save();
@@ -290,6 +290,47 @@ export const SettingsDialog: React.FC = () => {
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
+                                                <div className="flex justify-between">
+                                                    <label className="text-sm font-medium">Quality (CRF)</label>
+                                                    <span className="text-xs text-primary font-mono">{editingPreset.video.crf || 23}</span>
+                                                </div>
+                                                <input
+                                                    type="range"
+                                                    min="18"
+                                                    max="28"
+                                                    step="1"
+                                                    value={editingPreset.video.crf || 23}
+                                                    onChange={e => setEditingPreset({ ...editingPreset, video: { ...editingPreset.video, crf: parseInt(e.target.value) } })}
+                                                    className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                                                    title="Lower is better quality, Higher is smaller size"
+                                                />
+                                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                                    <span>High Quality</span>
+                                                    <span>Small Size</span>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Preset (Speed)</label>
+                                                <select
+                                                    value={editingPreset.video.preset || 'medium'}
+                                                    onChange={e => setEditingPreset({ ...editingPreset, video: { ...editingPreset.video, preset: e.target.value } })}
+                                                    className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                                >
+                                                    <option value="ultrafast" className="bg-background">Ultrafast</option>
+                                                    <option value="superfast" className="bg-background">Superfast</option>
+                                                    <option value="veryfast" className="bg-background">Veryfast</option>
+                                                    <option value="faster" className="bg-background">Faster</option>
+                                                    <option value="fast" className="bg-background">Fast</option>
+                                                    <option value="medium" className="bg-background">Medium (Default)</option>
+                                                    <option value="slow" className="bg-background">Slow</option>
+                                                    <option value="slower" className="bg-background">Slower</option>
+                                                    <option value="veryslow" className="bg-background">Veryslow</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2">
                                                 <label className="text-sm font-medium">Audio Strategy</label>
                                                 <select
                                                     value={editingPreset.audio.strategy || 'first_track'}
@@ -378,25 +419,24 @@ export const SettingsDialog: React.FC = () => {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label htmlFor="encoder-select" className="text-sm font-medium">
-                                                Default Video Encoder
+                                            <label htmlFor="preset-select" className="text-sm font-medium">
+                                                Default Preset
                                             </label>
                                             <select
-                                                id="encoder-select"
-                                                value={defaultEncoder}
-                                                onChange={(e) => setDefaultEncoder(e.target.value)}
+                                                id="preset-select"
+                                                value={defaultPresetId}
+                                                onChange={(e) => setDefaultPresetId(e.target.value)}
                                                 className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             >
-                                                {getAvailableEncoders().map((group) => (
-                                                    <optgroup key={group.label} label={group.label}>
-                                                        {group.options.map((opt) => (
-                                                            <option key={opt.value} value={opt.value} className="bg-background">
-                                                                {opt.label}
-                                                            </option>
-                                                        ))}
-                                                    </optgroup>
+                                                {presets.map((preset) => (
+                                                    <option key={preset.id} value={preset.id} className="bg-background">
+                                                        {preset.name}
+                                                    </option>
                                                 ))}
                                             </select>
+                                            <p className="text-xs text-muted-foreground">
+                                                This preset will be applied to all new videos added.
+                                            </p>
                                         </div>
 
                                         <div className="space-y-2">

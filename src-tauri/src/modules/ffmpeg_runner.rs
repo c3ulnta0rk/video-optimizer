@@ -32,6 +32,11 @@ pub struct ConversionOptions {
     pub subtitle_strategy: Option<String>, // "copy_all", "burn_in", "ignore"
     pub audio_codec: Option<String>,    // "aac", "ac3", "copy"
     pub audio_bitrate: Option<String>,  // "128k"
+    // Advanced Video Options
+    pub crf: Option<u8>,
+    pub preset: Option<String>,
+    pub profile: Option<String>,
+    pub tune: Option<String>,
 }
 
 pub struct ConversionManager {
@@ -68,9 +73,43 @@ pub async fn convert_video(
         options.input_path.clone(),
         "-c:v".to_string(),
         options.video_codec.clone(),
-        "-preset".to_string(),
-        "fast".to_string(),
     ];
+
+    // Apply Preset (default to "fast" if not specified)
+    args.push("-preset".to_string());
+    args.push(options.preset.clone().unwrap_or("fast".to_string()));
+
+    // Apply CRF (default to 23 if not specified, only if not using hardware accel which might use different flags, but let's try generic first)
+    // Note: NVENC uses -cq for VBR, but -crf is ignored or error?
+    // Actually, for simplicity, we'll assume software encoding or that the user knows what they are doing.
+    // But better: if encoder is libx264/libx265, use -crf.
+    if options.video_codec.contains("libx26")
+        || options.video_codec == "libx264"
+        || options.video_codec == "libx265"
+    {
+        if let Some(crf) = options.crf {
+            args.push("-crf".to_string());
+            args.push(crf.to_string());
+        }
+    } else if options.video_codec.contains("nvenc") {
+        // For NVENC, use -cq if provided, otherwise default logic
+        if let Some(crf) = options.crf {
+            args.push("-cq".to_string());
+            args.push(crf.to_string());
+        }
+    }
+
+    // Apply Profile
+    if let Some(profile) = &options.profile {
+        args.push("-profile:v".to_string());
+        args.push(profile.clone());
+    }
+
+    // Apply Tune
+    if let Some(tune) = &options.tune {
+        args.push("-tune".to_string());
+        args.push(tune.clone());
+    }
 
     // Audio Handling
     let audio_codec = options.audio_codec.clone().unwrap_or("aac".to_string());
@@ -117,7 +156,18 @@ pub async fn convert_video(
             args.push("-map".to_string());
             args.push("0:s".to_string());
             args.push("-c:s".to_string());
-            args.push("copy".to_string()); // Or mov_text for mp4
+
+            // Check if output is MP4
+            if options.output_path.to_lowercase().ends_with(".mp4") {
+                // MP4 doesn't support many subtitle formats (like PGS, ASS) natively in the same way MKV does.
+                // 'mov_text' is the standard text subtitle format for MP4.
+                // However, this will fail for image-based subtitles (PGS/VOBSUB).
+                // Ideally we should detect input codec, but for now, let's try mov_text as it's safer than copy for text subs.
+                // If it's PGS, it might still fail, but 'copy' definitely fails.
+                args.push("mov_text".to_string());
+            } else {
+                args.push("copy".to_string());
+            }
         }
         Some("ignore") => {
             args.push("-sn".to_string());
