@@ -16,20 +16,27 @@ struct TmdbSearchResponse {
     results: Vec<MovieSearchResult>,
 }
 
-pub fn search_movie(query: &str, api_key: &str) -> Result<Vec<MovieSearchResult>, String> {
+pub async fn search_movie(query: &str, api_key: &str) -> Result<Vec<MovieSearchResult>, String> {
     let url = format!(
         "{}/search/movie?api_key={}&query={}&language=fr-FR",
         BASE_URL, api_key, query
     );
 
-    let response = reqwest::blocking::get(&url).map_err(|e| format!("Request failed: {}", e))?;
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
 
     if !response.status().is_success() {
         return Err(format!("API Error: {}", response.status()));
     }
 
-    let search_response: TmdbSearchResponse =
-        response.json().map_err(|e| format!("Parse error: {}", e))?;
+    let search_response: TmdbSearchResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Parse error: {}", e))?;
 
     Ok(search_response.results)
 }

@@ -6,6 +6,8 @@ export interface ConversionSettingsOverride {
     subtitleStrategy?: string; // 'copy_all', 'burn_in', 'ignore'
     audioCodec?: string;
     audioBitrate?: string;
+    outputDir?: string;
+    outputName?: string;
 }
 
 export interface FileItem {
@@ -17,6 +19,10 @@ export interface FileItem {
     progress: number; // 0-100
     status: 'idle' | 'converting' | 'completed' | 'error';
     metadata?: any; // Placeholder for full metadata
+    tmdbId?: number;
+    posterPath?: string;
+    overview?: string;
+    releaseDate?: string;
     conversionSettings?: ConversionSettingsOverride;
 }
 
@@ -27,6 +33,7 @@ interface VideoStore {
     updateProgress: (id: string, progress: number) => void;
     updateStatus: (id: string, status: FileItem['status']) => void;
     updateFileSettings: (id: string, settings: ConversionSettingsOverride) => void;
+    updateMetadata: (id: string, metadata: Partial<FileItem>) => void;
     clearFiles: () => void;
 }
 
@@ -51,6 +58,11 @@ export const useVideoStore = create<VideoStore>((set) => ({
     updateFileSettings: (id, settings) => set((state) => ({
         files: state.files.map((f) =>
             f.id === id ? { ...f, conversionSettings: { ...f.conversionSettings, ...settings } } : f
+        )
+    })),
+    updateMetadata: (id, metadata) => set((state) => ({
+        files: state.files.map((f) =>
+            f.id === id ? { ...f, ...metadata } : f
         )
     })),
     clearFiles: () => set({ files: [] }),

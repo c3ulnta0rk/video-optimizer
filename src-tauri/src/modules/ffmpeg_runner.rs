@@ -1,12 +1,15 @@
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::process::Stdio;
-use tauri::{Emitter, Window};
+use std::sync::{Arc, Mutex};
+use tauri::{Emitter, State, Window};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
 #[derive(Clone, Serialize, Debug)]
 pub struct ConversionProgress {
+    pub id: String,
     pub frame: u64,
     pub fps: f64,
     pub time: String,
@@ -17,6 +20,7 @@ pub struct ConversionProgress {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConversionOptions {
+    pub id: String,
     pub input_path: String,
     pub output_path: String,
     pub video_codec: String,
@@ -28,6 +32,18 @@ pub struct ConversionOptions {
     pub subtitle_strategy: Option<String>, // "copy_all", "burn_in", "ignore"
     pub audio_codec: Option<String>,    // "aac", "ac3", "copy"
     pub audio_bitrate: Option<String>,  // "128k"
+}
+
+pub struct ConversionManager {
+    pub processes: Arc<Mutex<HashMap<String, u32>>>,
+}
+
+impl ConversionManager {
+    pub fn new() -> Self {
+        Self {
+            processes: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
 }
 
 fn parse_time_to_seconds(time_str: &str) -> f64 {
@@ -42,7 +58,11 @@ fn parse_time_to_seconds(time_str: &str) -> f64 {
     }
 }
 
-pub async fn convert_video(window: Window, options: ConversionOptions) -> Result<(), String> {
+pub async fn convert_video(
+    window: Window,
+    options: ConversionOptions,
+    state: State<'_, ConversionManager>,
+) -> Result<(), String> {
     let mut args = vec![
         "-i".to_string(),
         options.input_path.clone(),
@@ -122,6 +142,14 @@ pub async fn convert_video(window: Window, options: ConversionOptions) -> Result
         .spawn()
         .map_err(|e| format!("Failed to start ffmpeg: {}", e))?;
 
+    if let Some(pid) = child.id() {
+        state
+            .processes
+            .lock()
+            .unwrap()
+            .insert(options.id.clone(), pid);
+    }
+
     let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
     let reader = BufReader::new(stderr);
     let mut lines = reader.lines();
@@ -144,6 +172,7 @@ pub async fn convert_video(window: Window, options: ConversionOptions) -> Result
             };
 
             let progress_data = ConversionProgress {
+                id: options.id.clone(),
                 frame,
                 fps,
                 time,
@@ -155,6 +184,9 @@ pub async fn convert_video(window: Window, options: ConversionOptions) -> Result
             window
                 .emit("conversion_progress", progress_data)
                 .map_err(|e| e.to_string())?;
+        } else {
+            // Log other stderr lines (warnings, errors)
+            println!("[FFmpeg Stderr]: {}", line);
         }
     }
 
@@ -163,9 +195,30 @@ pub async fn convert_video(window: Window, options: ConversionOptions) -> Result
         .await
         .map_err(|e| format!("Failed to wait for ffmpeg: {}", e))?;
 
+    // Remove PID from map
+    state.processes.lock().unwrap().remove(&options.id);
+
     if !status.success() {
         return Err(format!("FFmpeg exited with status: {}", status));
     }
 
     Ok(())
+}
+
+pub fn cancel_conversion(id: &str, state: State<'_, ConversionManager>) -> Result<(), String> {
+    let pid = {
+        let processes = state.processes.lock().unwrap();
+        processes.get(id).cloned()
+    };
+
+    if let Some(pid) = pid {
+        // Use system kill command for simplicity on Linux
+        let _ = std::process::Command::new("kill")
+            .arg(pid.to_string())
+            .output()
+            .map_err(|e| format!("Failed to kill process: {}", e))?;
+        Ok(())
+    } else {
+        Err("Process not found".to_string())
+    }
 }

@@ -17,8 +17,22 @@ fn get_video_metadata(file_path: String) -> Result<VideoMetadata, String> {
 async fn convert_video_command(
     window: tauri::Window,
     options: modules::ffmpeg_runner::ConversionOptions,
+    state: tauri::State<'_, modules::ffmpeg_runner::ConversionManager>,
 ) -> Result<(), String> {
-    modules::ffmpeg_runner::convert_video(window, options).await
+    modules::ffmpeg_runner::convert_video(window, options, state).await
+}
+
+#[tauri::command]
+fn cancel_conversion_command(
+    id: String,
+    state: tauri::State<'_, modules::ffmpeg_runner::ConversionManager>,
+) -> Result<(), String> {
+    modules::ffmpeg_runner::cancel_conversion(&id, state)
+}
+
+#[tauri::command]
+fn clean_filename_command(filename: String) -> String {
+    modules::smart_renamer::clean_filename(&filename)
 }
 
 #[tauri::command]
@@ -26,13 +40,7 @@ async fn search_movie_command(
     query: String,
     api_key: String,
 ) -> Result<Vec<modules::tmdb_client::MovieSearchResult>, String> {
-    // In a real app, this should be async using reqwest::Client
-    // For now, we wrap the blocking call
-    tauri::async_runtime::spawn_blocking(move || {
-        modules::tmdb_client::search_movie(&query, &api_key)
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    modules::tmdb_client::search_movie(&query, &api_key).await
 }
 
 #[tauri::command]
@@ -56,6 +64,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
+        .manage(modules::ffmpeg_runner::ConversionManager::new())
         .setup(|app| {
             use tauri::menu::{Menu, MenuItem};
             use tauri::tray::TrayIconBuilder;
@@ -88,9 +97,11 @@ pub fn run() {
             greet,
             get_video_metadata,
             convert_video_command,
-            search_movie_command,
+            cancel_conversion_command,
+            clean_filename_command,
+            get_gpu_capabilities_command,
             generate_filename_command,
-            get_gpu_capabilities_command
+            search_movie_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

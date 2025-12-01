@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, X, Save, Eye, EyeOff, Check, X as XIcon, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Settings, X, Save, Eye, EyeOff, Check, X as XIcon, Plus, Trash2, Edit2, FolderOpen } from 'lucide-react';
 import { Store } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { Preset, DEFAULT_PRESETS } from '../types/preset';
 
 interface GpuCapabilities {
@@ -28,6 +29,7 @@ export const SettingsDialog: React.FC = () => {
     const [apiKey, setApiKey] = useState('');
     const [showApiKey, setShowApiKey] = useState(false);
     const [defaultEncoder, setDefaultEncoder] = useState('libx264');
+    const [defaultOutputDir, setDefaultOutputDir] = useState('');
 
     // Presets
     const [presets, setPresets] = useState<Preset[]>([]);
@@ -55,6 +57,9 @@ export const SettingsDialog: React.FC = () => {
                 const encoder = await _store.get<string>('default_encoder');
                 if (encoder) setDefaultEncoder(encoder);
 
+                const outputDir = await _store.get<string>('default_output_dir');
+                if (outputDir) setDefaultOutputDir(outputDir);
+
                 // Load Presets
                 const savedPresets = await _store.get<Preset[]>('presets');
                 if (savedPresets) {
@@ -78,6 +83,7 @@ export const SettingsDialog: React.FC = () => {
         try {
             await store.set('tmdb_api_key', apiKey);
             await store.set('default_encoder', defaultEncoder);
+            await store.set('default_output_dir', defaultOutputDir);
             await store.set('presets', presets);
             await store.save();
             setIsOpen(false);
@@ -269,8 +275,14 @@ export const SettingsDialog: React.FC = () => {
                                                     onChange={e => setEditingPreset({ ...editingPreset, video: { ...editingPreset.video, codec: e.target.value } })}
                                                     className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
                                                 >
-                                                    {getAvailableEncoders().map(enc => (
-                                                        <option key={enc.value} value={enc.value} className="bg-background">{enc.label}</option>
+                                                    {getAvailableEncoders().map((group) => (
+                                                        <optgroup key={group.label} label={group.label}>
+                                                            {group.options.map((opt) => (
+                                                                <option key={opt.value} value={opt.value} className="bg-background">
+                                                                    {opt.label}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
                                                     ))}
                                                 </select>
                                             </div>
@@ -375,12 +387,60 @@ export const SettingsDialog: React.FC = () => {
                                                 onChange={(e) => setDefaultEncoder(e.target.value)}
                                                 className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
                                             >
-                                                {getAvailableEncoders().map((enc) => (
-                                                    <option key={enc.value} value={enc.value} className="bg-background">
-                                                        {enc.label}
-                                                    </option>
+                                                {getAvailableEncoders().map((group) => (
+                                                    <optgroup key={group.label} label={group.label}>
+                                                        {group.options.map((opt) => (
+                                                            <option key={opt.value} value={opt.value} className="bg-background">
+                                                                {opt.label}
+                                                            </option>
+                                                        ))}
+                                                    </optgroup>
                                                 ))}
                                             </select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Default Output Directory</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={defaultOutputDir}
+                                                    readOnly
+                                                    placeholder="Same as input file (Default)"
+                                                    className="flex-1 px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                                                />
+                                                <button
+                                                    onClick={async () => {
+                                                        const selected = await open({
+                                                            directory: true,
+                                                            multiple: false,
+                                                            defaultPath: defaultOutputDir || undefined
+                                                        });
+                                                        if (selected && typeof selected === 'string') {
+                                                            setDefaultOutputDir(selected);
+                                                        } else if (selected === null) {
+                                                            // User cancelled, do nothing or clear? 
+                                                            // Let's allow clearing if they want to reset to default
+                                                        }
+                                                    }}
+                                                    className="p-2 rounded-md border hover:bg-muted transition-colors"
+                                                    title="Select Folder"
+                                                >
+                                                    <FolderOpen className="w-5 h-5" />
+                                                </button>
+                                                {defaultOutputDir && (
+                                                    <button
+                                                        onClick={() => setDefaultOutputDir('')}
+                                                        className="p-2 rounded-md border hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                                        title="Clear (Use Input Directory)"
+                                                    >
+                                                        <Trash2 className="w-5 h-5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                If set, all converted videos will be saved here. Otherwise, they are saved next to the original file.
+                                            </p>
                                         </div>
 
                                         <div className="space-y-3">
