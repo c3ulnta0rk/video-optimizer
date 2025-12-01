@@ -204,10 +204,14 @@ pub async fn convert_video(
     let reader = BufReader::new(stderr);
     let mut lines = reader.lines();
 
-    let re = Regex::new(r"frame=\s*(\d+)\s+fps=\s*([\d\.]+)\s+.*time=\s*([\d:.]+)\s+.*bitrate=\s*([\w\./]+)\s+.*speed=\s*([\d\.]+)x").unwrap();
+    use once_cell::sync::Lazy;
+
+    static RE: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"frame=\s*(\d+)\s+fps=\s*([\d\.]+)\s+.*time=\s*([\d:.]+)\s+.*bitrate=\s*([\w\./]+)\s+.*speed=\s*([\d\.]+)x").unwrap()
+    });
 
     while let Ok(Some(line)) = lines.next_line().await {
-        if let Some(caps) = re.captures(&line) {
+        if let Some(caps) = RE.captures(&line) {
             let frame = caps[1].parse::<u64>().unwrap_or(0);
             let fps = caps[2].parse::<f64>().unwrap_or(0.0);
             let time = caps[3].to_string();
@@ -262,11 +266,33 @@ pub fn cancel_conversion(id: &str, state: State<'_, ConversionManager>) -> Resul
     };
 
     if let Some(pid) = pid {
-        // Use system kill command for simplicity on Linux
-        let _ = std::process::Command::new("kill")
-            .arg(pid.to_string())
-            .output()
-            .map_err(|e| format!("Failed to kill process: {}", e))?;
+        #[cfg(unix)]
+        {
+            // Use libc to send SIGTERM for a cleaner exit, then SIGKILL if needed
+            // For now, sticking to "kill" command is simple and effective for external processes
+            // But let's try to be a bit more graceful
+            let _ = std::process::Command::new("kill")
+                .arg("-15") // SIGTERM
+                .arg(pid.to_string())
+                .output();
+
+            // Give it a moment? No, async context here is tricky without async function.
+            // Let's just force kill for now to be sure, as FFmpeg might not exit immediately on SIGTERM during heavy load
+            let _ = std::process::Command::new("kill")
+                .arg("-9") // SIGKILL
+                .arg(pid.to_string())
+                .output()
+                .map_err(|e| format!("Failed to kill process: {}", e))?;
+        }
+        #[cfg(windows)]
+        {
+            let _ = std::process::Command::new("taskkill")
+                .arg("/F")
+                .arg("/PID")
+                .arg(pid.to_string())
+                .output()
+                .map_err(|e| format!("Failed to kill process: {}", e))?;
+        }
         Ok(())
     } else {
         Err("Process not found".to_string())
