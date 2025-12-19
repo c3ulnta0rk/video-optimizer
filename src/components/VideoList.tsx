@@ -197,7 +197,7 @@ const FileItem = React.memo(({
                                             // Reset select to empty
                                             e.target.value = "";
                                         }}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
                                     >
                                         <option value="">Select a preset to apply...</option>
                                         {availablePresets.map(p => (
@@ -210,7 +210,7 @@ const FileItem = React.memo(({
                                     <select
                                         value={file.conversionSettings?.videoCodec || 'default'}
                                         onChange={(e) => updateFileSettings(file.id, { videoCodec: e.target.value })}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
                                     >
                                         <option value="default">Default (Global)</option>
                                         <option value="libx264">H.264 (CPU)</option>
@@ -240,7 +240,7 @@ const FileItem = React.memo(({
                                                 outputName: newName
                                             });
                                         }}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
                                     >
                                         <option value="mp4">MP4</option>
                                         <option value="mkv">MKV</option>
@@ -254,7 +254,7 @@ const FileItem = React.memo(({
                                     <select
                                         value={file.conversionSettings?.audioStrategy || 'first_track'}
                                         onChange={(e) => updateFileSettings(file.id, { audioStrategy: e.target.value })}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
                                     >
                                         <option value="first_track">First Track</option>
                                         <option value="copy_all">Copy All Tracks</option>
@@ -270,7 +270,7 @@ const FileItem = React.memo(({
                                             <select
                                                 value={file.conversionSettings?.audioCodec || 'aac'}
                                                 onChange={(e) => updateFileSettings(file.id, { audioCodec: e.target.value })}
-                                                className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                                className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
                                             >
                                                 <option value="aac">AAC</option>
                                                 <option value="ac3">AC3</option>
@@ -282,7 +282,7 @@ const FileItem = React.memo(({
                                             <select
                                                 value={file.conversionSettings?.audioBitrate || '128k'}
                                                 onChange={(e) => updateFileSettings(file.id, { audioBitrate: e.target.value })}
-                                                className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                                className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
                                             >
                                                 <option value="64k">64k</option>
                                                 <option value="128k">128k</option>
@@ -298,7 +298,7 @@ const FileItem = React.memo(({
                                     <select
                                         value={file.conversionSettings?.subtitleStrategy || 'ignore'}
                                         onChange={(e) => updateFileSettings(file.id, { subtitleStrategy: e.target.value })}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
                                     >
                                         <option value="ignore">Ignore</option>
                                         <option value="copy_all">Copy All</option>
@@ -334,7 +334,7 @@ const FileItem = React.memo(({
                                         <select
                                             value={file.conversionSettings?.preset || 'medium'}
                                             onChange={(e) => updateFileSettings(file.id, { preset: e.target.value })}
-                                            className="w-full px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                            className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
                                         >
                                             <option value="ultrafast">Ultrafast</option>
                                             <option value="superfast">Superfast</option>
@@ -580,14 +580,7 @@ export const VideoList: React.FC = () => {
         }
     };
 
-    const stopConversion = async (id: string) => {
-        try {
-            await invoke('cancel_conversion_command', { id });
-            updateStatus(id, 'idle'); // Reset to idle or 'cancelled'
-        } catch (e) {
-            console.error('Failed to stop conversion', e);
-        }
-    };
+
 
     return (
         <div className="mt-8 space-y-4">

@@ -25,3 +25,20 @@ dist-ssr
 
 # Flatpak
 flatpak/
+
+# Snap
+# snap/ <- Removed to track snapcraft.yaml
+parts/
+stage/
+prime/
+*.snap
+
+# Media
+*.mkv
+*.mp4
+*.avi
+
+# Misc
+coverage/
+.env
+.env.*
