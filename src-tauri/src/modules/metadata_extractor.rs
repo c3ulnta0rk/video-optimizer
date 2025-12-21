@@ -26,6 +26,7 @@ pub struct VideoMetadata {
     pub audio_streams: Vec<AudioStream>,
     pub subtitle_streams: Vec<SubtitleStream>,
     pub size: u64, // Added size field
+    pub total_frames: Option<u64>, // Total number of frames in the video
 }
 
 pub fn extract_metadata(file_path: &str) -> Result<VideoMetadata, String> {
@@ -107,6 +108,34 @@ pub fn extract_metadata(file_path: &str) -> Result<VideoMetadata, String> {
         }
     }
 
+    // Extract total frames from video stream
+    let mut total_frames = None;
+    if let Some(streams) = json["streams"].as_array() {
+        for stream in streams {
+            if stream["codec_type"].as_str() == Some("video") {
+                // Try to get nb_frames from stream tags or calculate from duration and fps
+                if let Some(nb_frames) = stream["nb_frames"].as_str() {
+                    total_frames = nb_frames.parse::<u64>().ok();
+                } else if let Some(nb_frames) = stream["nb_frames"].as_u64() {
+                    total_frames = Some(nb_frames);
+                } else if let Some(fps_str) = stream["r_frame_rate"].as_str() {
+                    // Calculate from fps and duration: frames = duration * fps
+                    // r_frame_rate is in format "num/den" (e.g., "24/1" or "30000/1001")
+                    let parts: Vec<&str> = fps_str.split('/').collect();
+                    if parts.len() == 2 {
+                        if let (Ok(num), Ok(den)) = (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
+                            if den > 0.0 {
+                                let fps = num / den;
+                                total_frames = Some((duration * fps) as u64);
+                            }
+                        }
+                    }
+                }
+                break; // Only need first video stream
+            }
+        }
+    }
+
     Ok(VideoMetadata {
         duration,
         width,
@@ -116,5 +145,6 @@ pub fn extract_metadata(file_path: &str) -> Result<VideoMetadata, String> {
         audio_streams,
         subtitle_streams,
         size,
+        total_frames,
     })
 }

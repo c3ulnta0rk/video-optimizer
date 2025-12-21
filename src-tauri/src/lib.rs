@@ -36,6 +36,21 @@ fn clean_filename_command(filename: String) -> String {
 }
 
 #[tauri::command]
+fn generate_smart_filename_command(
+    filename: String,
+    metadata: VideoMetadata,
+    output_video_codec: Option<String>,
+    container: String,
+) -> String {
+    modules::smart_renamer::generate_smart_filename(
+        &filename,
+        &metadata,
+        output_video_codec.as_deref(),
+        &container,
+    )
+}
+
+#[tauri::command]
 async fn search_movie_command(
     query: String,
     api_key: String,
@@ -99,6 +114,7 @@ pub fn run() {
             convert_video_command,
             cancel_conversion_command,
             clean_filename_command,
+            generate_smart_filename_command,
             get_gpu_capabilities_command,
             generate_filename_command,
             search_movie_command

@@ -31,6 +31,7 @@ export const DragDropZone: React.FC = () => {
                     path: path,
                     size: sizeFormatted,
                     duration: metadata.duration || 0,
+                    totalFrames: metadata.total_frames || undefined,
                     progress: 0,
                     status: 'idle',
                     metadata: metadata

@@ -1,4 +1,3 @@
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Stdio;
@@ -6,19 +5,22 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, State, Window};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tokio::task;
 
 #[derive(Clone, Serialize, Debug)]
 pub struct ConversionProgress {
     pub id: String,
     pub frame: u64,
     pub fps: f64,
-    pub time: String,
+    pub time: String, // Time position in the output video (HH:MM:SS)
+    pub elapsed_time: String, // Time elapsed since conversion started (HH:MM:SS)
     pub bitrate: String,
     pub speed: String,
     pub progress: f64, // 0.0 to 100.0
+    pub time_remaining: Option<String>, // Estimated time remaining (HH:MM:SS)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ConversionOptions {
     pub id: String,
     pub input_path: String,
@@ -27,6 +29,7 @@ pub struct ConversionOptions {
     pub audio_track_index: Option<u32>,
     pub subtitle_track_index: Option<u32>,
     pub duration_seconds: f64,
+    pub total_frames: Option<u64>, // Total number of frames in the video
     // New strategies
     pub audio_strategy: Option<String>, // "copy_all", "convert_all", "first_track"
     pub subtitle_strategy: Option<String>, // "copy_all", "burn_in", "ignore"
@@ -51,18 +54,6 @@ impl ConversionManager {
     }
 }
 
-fn parse_time_to_seconds(time_str: &str) -> f64 {
-    let parts: Vec<&str> = time_str.split(':').collect();
-    if parts.len() == 3 {
-        let hours: f64 = parts[0].parse().unwrap_or(0.0);
-        let minutes: f64 = parts[1].parse().unwrap_or(0.0);
-        let seconds: f64 = parts[2].parse().unwrap_or(0.0);
-        hours * 3600.0 + minutes * 60.0 + seconds
-    } else {
-        0.0
-    }
-}
-
 pub async fn convert_video(
     window: Window,
     options: ConversionOptions,
@@ -75,9 +66,42 @@ pub async fn convert_video(
         options.video_codec.clone(),
     ];
 
-    // Apply Preset (default to "fast" if not specified)
+    // Apply Preset (convert software presets to hardware presets if needed)
+    let preset = options.preset.clone().unwrap_or_else(|| {
+        if options.video_codec.contains("nvenc") {
+            "p4".to_string() // Default NVENC preset (balanced)
+        } else {
+            "fast".to_string() // Default software preset
+        }
+    });
+    
+    // Convert software preset names to NVENC presets if using NVENC
+    let final_preset = if options.video_codec.contains("nvenc") {
+        match preset.as_str() {
+            "ultrafast" => "p1",
+            "superfast" => "p2",
+            "veryfast" => "p3",
+            "faster" => "p3",
+            "fast" => "p4",
+            "medium" => "p4",
+            "slow" => "p5",
+            "slower" => "p6",
+            "veryslow" => "p7",
+            _ => {
+                // If already a p1-p7 preset, use as-is, otherwise default to p4
+                if preset.starts_with('p') && preset.len() == 2 {
+                    preset.as_str()
+                } else {
+                    "p4"
+                }
+            }
+        }
+    } else {
+        preset.as_str()
+    };
+    
     args.push("-preset".to_string());
-    args.push(options.preset.clone().unwrap_or("fast".to_string()));
+    args.push(final_preset.to_string());
 
     // Apply CRF (default to 23 if not specified, only if not using hardware accel which might use different flags, but let's try generic first)
     // Note: NVENC uses -cq for VBR, but -crf is ignored or error?
@@ -111,6 +135,10 @@ pub async fn convert_video(
         args.push(tune.clone());
     }
 
+    // Map video stream first (required for video output)
+    args.push("-map".to_string());
+    args.push("0:v".to_string());
+
     // Audio Handling
     let audio_codec = options.audio_codec.clone().unwrap_or("aac".to_string());
     let audio_bitrate = options.audio_bitrate.clone().unwrap_or("128k".to_string());
@@ -129,7 +157,7 @@ pub async fn convert_video(
             args.push(audio_codec.clone());
             if audio_codec != "copy" {
                 args.push("-b:a".to_string());
-                args.push(audio_bitrate);
+                args.push(audio_bitrate.clone());
             }
         }
         _ => {
@@ -182,15 +210,34 @@ pub async fn convert_video(
         }
     }
 
+    // Create a temporary progress file
+    let progress_file = std::env::temp_dir().join(format!("ffmpeg_progress_{}.txt", options.id));
+    let progress_file_str = progress_file.to_string_lossy().to_string();
+    
+    // Use -progress to force FFmpeg to write progress to a file
+    // This is the most reliable way to get progress when stderr is not a TTY
+    args.push("-progress".to_string());
+    args.push(progress_file_str.clone());
+    
     args.push("-y".to_string());
     args.push(options.output_path.clone());
+
+    // Log the command for debugging
+    eprintln!("[FFmpeg Command]: ffmpeg {}", args.join(" "));
 
     let mut child = Command::new("ffmpeg")
         .args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to start ffmpeg: {}", e))?;
+        .map_err(|e| {
+            let error_msg = format!(
+                "Failed to start ffmpeg: {}. Make sure ffmpeg is installed and in your PATH.",
+                e
+            );
+            eprintln!("{}", error_msg);
+            error_msg
+        })?;
 
     if let Some(pid) = child.id() {
         state
@@ -200,62 +247,229 @@ pub async fn convert_video(
             .insert(options.id.clone(), pid);
     }
 
+    // Spawn a task to read the progress file
+    let progress_file_clone = progress_file.clone();
+    let window_clone = window.clone();
+    let options_id = options.id.clone();
+    let options_duration = options.duration_seconds;
+    let options_total_frames = options.total_frames;
+    
+    // Create a channel to signal when conversion is done
+    let (tx, mut rx) = tokio::sync::oneshot::channel::<()>();
+    let tx_clone = tx;
+    
+    let progress_task = task::spawn(async move {
+        use tokio::time::{sleep, Duration, Instant};
+        use std::collections::VecDeque;
+        
+        // History to calculate average speed over last 10 seconds
+        // Store (timestamp, frame_count) pairs
+        let mut frame_history: VecDeque<(Instant, u64)> = VecDeque::new();
+        const HISTORY_DURATION_SECS: u64 = 10;
+        
+        // Track when conversion started
+        let start_time = Instant::now();
+        
+        // Wait a bit for the file to be created
+        sleep(Duration::from_millis(500)).await;
+        
+        loop {
+            // Check if we should stop
+            if rx.try_recv().is_ok() {
+                break;
+            }
+            
+            // Read the entire progress file and parse it
+            if let Ok(content) = tokio::fs::read_to_string(&progress_file_clone).await {
+                let mut frame = 0u64;
+                let mut fps = 0.0;
+                let mut bitrate = String::new();
+                let mut speed = String::new();
+                let mut time_ms = 0.0;
+                
+                for line in content.lines() {
+                    if line.starts_with("frame=") {
+                        if let Some(val) = line.strip_prefix("frame=") {
+                            frame = val.trim().parse().unwrap_or(0);
+                        }
+                    } else if line.starts_with("fps=") {
+                        if let Some(val) = line.strip_prefix("fps=") {
+                            fps = val.trim().parse().unwrap_or(0.0);
+                        }
+                    } else if line.starts_with("bitrate=") {
+                        if let Some(val) = line.strip_prefix("bitrate=") {
+                            bitrate = val.trim().to_string();
+                        }
+                    } else if line.starts_with("speed=") {
+                        if let Some(val) = line.strip_prefix("speed=") {
+                            speed = val.trim().to_string();
+                        }
+                    } else if line.starts_with("out_time_ms=") {
+                        if let Some(val) = line.strip_prefix("out_time_ms=") {
+                            time_ms = val.trim().parse().unwrap_or(0.0);
+                        }
+                    }
+                }
+                
+                // Only emit if we have valid frame data
+                if frame > 0 {
+                    let current_seconds = if time_ms > 0.0 {
+                        time_ms / 1_000_000.0 // Convert microseconds to seconds
+                    } else {
+                        0.0
+                    };
+                    
+                    // Calculate progress based on frames if we have total_frames
+                    let progress = if let Some(total_frames) = options_total_frames {
+                        if total_frames > 0 {
+                            ((frame as f64 / total_frames as f64) * 100.0).min(100.0).max(0.0)
+                        } else {
+                            0.0
+                        }
+                    } else if options_duration > 0.0 && current_seconds > 0.0 {
+                        // Fallback to time-based if frames not available
+                        (current_seconds / options_duration * 100.0).min(100.0).max(0.0)
+                    } else {
+                        0.0
+                    };
+                    
+                    // Update frame history for average speed calculation
+                    let now = Instant::now();
+                    frame_history.push_back((now, frame));
+                    
+                    // Remove entries older than HISTORY_DURATION_SECS
+                    while let Some(&(timestamp, _)) = frame_history.front() {
+                        if now.duration_since(timestamp).as_secs() > HISTORY_DURATION_SECS {
+                            frame_history.pop_front();
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    // Calculate average frames per second over the last 10 seconds
+                    let avg_fps = if frame_history.len() >= 2 {
+                        let oldest = frame_history.front().unwrap();
+                        let newest = frame_history.back().unwrap();
+                        let time_diff = newest.0.duration_since(oldest.0).as_secs_f64();
+                        let frame_diff = newest.1.saturating_sub(oldest.1) as f64;
+                        
+                        if time_diff > 0.0 {
+                            frame_diff / time_diff
+                        } else {
+                            fps // Fallback to current fps
+                        }
+                    } else {
+                        fps // Use current fps if not enough history
+                    };
+                    
+                    // Calculate time remaining based on average speed
+                    let time_remaining = if let Some(total_frames) = options_total_frames {
+                        if total_frames > frame && avg_fps > 0.0 {
+                            let remaining_frames = (total_frames - frame) as f64;
+                            let remaining_seconds = remaining_frames / avg_fps;
+                            Some(remaining_seconds)
+                        } else {
+                            None
+                        }
+                    } else if options_duration > 0.0 && current_seconds > 0.0 && avg_fps > 0.0 {
+                        // Fallback: estimate based on duration and current progress
+                        let remaining_seconds = (options_duration - current_seconds).max(0.0);
+                        Some(remaining_seconds)
+                    } else {
+                        None
+                    };
+                    
+                    // Format time remaining
+                    let time_remaining_str = time_remaining.map(|secs| {
+                        let hours = (secs as u64) / 3600;
+                        let minutes = ((secs as u64) % 3600) / 60;
+                        let secs_remaining = (secs as u64) % 60;
+                        format!("{:02}:{:02}:{:02}", hours, minutes, secs_remaining)
+                    });
+                    
+                    // Format current time (position in output video)
+                    let time_str = if current_seconds > 0.0 {
+                        let hours = (current_seconds as u64) / 3600;
+                        let minutes = ((current_seconds as u64) % 3600) / 60;
+                        let secs = (current_seconds as u64) % 60;
+                        format!("{:02}:{:02}:{:02}", hours, minutes, secs)
+                    } else {
+                        String::new()
+                    };
+                    
+                    // Calculate elapsed time since conversion started
+                    let elapsed_seconds = start_time.elapsed().as_secs();
+                    let elapsed_hours = elapsed_seconds / 3600;
+                    let elapsed_minutes = (elapsed_seconds % 3600) / 60;
+                    let elapsed_secs = elapsed_seconds % 60;
+                    let elapsed_time_str = format!("{:02}:{:02}:{:02}", elapsed_hours, elapsed_minutes, elapsed_secs);
+                    
+                    // Only emit if progress is reasonable (not jumping to 100% immediately)
+                    if progress < 100.0 || frame >= options_total_frames.unwrap_or(u64::MAX) {
+                        let progress_data = ConversionProgress {
+                            id: options_id.clone(),
+                            frame,
+                            fps,
+                            time: time_str,
+                            elapsed_time: elapsed_time_str,
+                            bitrate,
+                            speed,
+                            progress,
+                            time_remaining: time_remaining_str,
+                        };
+                        
+                        let _ = window_clone.emit("conversion_progress", progress_data);
+                    }
+                }
+            }
+            
+            sleep(Duration::from_millis(200)).await; // Check every 200ms
+        }
+    });
+    
+    // Read stderr for errors and warnings
     let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
     let reader = BufReader::new(stderr);
     let mut lines = reader.lines();
-
-    use once_cell::sync::Lazy;
-
-    static RE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"frame=\s*(\d+)\s+fps=\s*([\d\.]+)\s+.*time=\s*([\d:.]+)\s+.*bitrate=\s*([\w\./]+)\s+.*speed=\s*([\d\.]+)x").unwrap()
-    });
-
+    
     while let Ok(Some(line)) = lines.next_line().await {
-        if let Some(caps) = RE.captures(&line) {
-            let frame = caps[1].parse::<u64>().unwrap_or(0);
-            let fps = caps[2].parse::<f64>().unwrap_or(0.0);
-            let time = caps[3].to_string();
-            let bitrate = caps[4].to_string();
-            let speed = caps[5].to_string();
-
-            let current_seconds = parse_time_to_seconds(&time);
-            let progress = if options.duration_seconds > 0.0 {
-                (current_seconds / options.duration_seconds * 100.0).min(100.0)
-            } else {
-                0.0
-            };
-
-            let progress_data = ConversionProgress {
-                id: options.id.clone(),
-                frame,
-                fps,
-                time,
-                bitrate,
-                speed,
-                progress,
-            };
-
-            window
-                .emit("conversion_progress", progress_data)
-                .map_err(|e| e.to_string())?;
-        } else {
-            // Log other stderr lines (warnings, errors)
-            println!("[FFmpeg Stderr]: {}", line);
-        }
+        // Log stderr lines (warnings, errors)
+        eprintln!("[FFmpeg Stderr]: {}", line);
     }
+    
+    // Signal progress task to stop
+    let _ = tx_clone.send(());
+    
+    // Wait a bit for the task to finish, then abort if needed
+    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+    progress_task.abort();
+    
+    // Clean up progress file
+    let _ = std::fs::remove_file(&progress_file);
 
     let status = child
         .wait()
         .await
-        .map_err(|e| format!("Failed to wait for ffmpeg: {}", e))?;
+        .map_err(|e| {
+            let error_msg = format!("Failed to wait for ffmpeg: {}", e);
+            eprintln!("{}", error_msg);
+            error_msg
+        })?;
 
     // Remove PID from map
     state.processes.lock().unwrap().remove(&options.id);
 
     if !status.success() {
-        return Err(format!("FFmpeg exited with status: {}", status));
+        let exit_code = status.code().unwrap_or(-1);
+        let error_msg = format!(
+            "FFmpeg exited with error code: {}. Check the console output above for details.",
+            exit_code
+        );
+        eprintln!("{}", error_msg);
+        return Err(error_msg);
     }
 
+    eprintln!("[FFmpeg] Conversion completed successfully for {}", options.id);
     Ok(())
 }
 

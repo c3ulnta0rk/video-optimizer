@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FileVideo, Trash2, Play, Settings as SettingsIcon, FolderOpen, Wand2, Search, Square } from 'lucide-react';
+import { FileVideo, Trash2, Play, Settings as SettingsIcon, FolderOpen, Wand2, Search, Square, X } from 'lucide-react';
 import { useVideoStore } from '../store/videoStore';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
@@ -19,7 +19,8 @@ const FileItem = React.memo(({
     conversionDetails,
     openSearchDialog,
     availablePresets,
-    defaultPresetId
+    defaultPresetId,
+    updateStatus
 }: {
     file: any,
     expandedFileId: string | null,
@@ -29,19 +30,11 @@ const FileItem = React.memo(({
     conversionDetails: any,
     openSearchDialog: (id: string) => void,
     availablePresets: any[],
-    defaultPresetId: string
+    defaultPresetId: string,
+    updateStatus: (id: string, status: 'idle' | 'converting' | 'completed' | 'error') => void
 }) => {
     const isExpanded = expandedFileId === file.id;
     const details = conversionDetails[file.id];
-
-    // Helper to format size
-    const formatSize = (bytes: number) => {
-        if (bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    };
 
     // Helper to format duration
     const formatDuration = (seconds: number) => {
@@ -106,10 +99,12 @@ const FileItem = React.memo(({
                             )}
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1 bg-secondary/50 px-1.5 py-0.5 rounded-md">
-                                <FolderOpen className="w-3 h-3" />
-                                {formatSize(file.size)}
-                            </span>
+                            {file.size && file.size !== "Unknown" && (
+                                <span className="flex items-center gap-1 bg-secondary/50 px-1.5 py-0.5 rounded-md">
+                                    <FolderOpen className="w-3 h-3" />
+                                    {file.size}
+                                </span>
+                            )}
                             {file.duration > 0 && (
                                 <span className="flex items-center gap-1 bg-secondary/50 px-1.5 py-0.5 rounded-md">
                                     <Play className="w-3 h-3" />
@@ -122,15 +117,62 @@ const FileItem = React.memo(({
                                         {details.fps.toFixed(1)} fps
                                     </span>
                                     <span className="text-primary font-medium">
-                                        {details.speed}
+                                        {details.speed.includes('x') ? details.speed : `${details.speed}x`}
                                     </span>
                                 </>
                             )}
                         </div>
+                        {/* Progress Bar */}
+                        {file.status === 'converting' && (
+                            <div className="mt-2 space-y-1">
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">Progression</span>
+                                    <span className="font-medium text-primary">{Math.round(file.progress)}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                                        style={{ width: `${file.progress}%` }}
+                                    />
+                                </div>
+                                {details && (
+                                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                        {details.elapsed_time && (
+                                            <span>Écoulé: {details.elapsed_time}</span>
+                                        )}
+                                        {details.time && (
+                                            <span>• Position: {details.time}</span>
+                                        )}
+                                        {details.time_remaining && (
+                                            <span className="text-primary font-medium">• Restant: {details.time_remaining}</span>
+                                        )}
+                                        {details.speed && (
+                                            <span>• Vitesse: {details.speed.includes('x') ? details.speed : `${details.speed}x`}</span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0">
+                        {file.status === 'converting' && (
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await invoke('cancel_conversion_command', { id: file.id });
+                                        updateStatus(file.id, 'idle');
+                                    } catch (e) {
+                                        console.error('Failed to cancel conversion', e);
+                                    }
+                                }}
+                                className="p-2 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+                                title="Arrêter la conversion"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
                         <button
                             onClick={() => openSearchDialog(file.id)}
                             className="p-2 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
@@ -362,19 +404,36 @@ const FileItem = React.memo(({
                                         <button
                                             onClick={async () => {
                                                 try {
-                                                    const cleanName = await invoke<string>('clean_filename_command', { filename: file.name });
-                                                    // cleanName comes with .mp4 by default from backend. 
-                                                    // We need to ensure it matches the current container.
-                                                    const currentContainer = file.conversionSettings?.container || availablePresets.find(p => p.id === defaultPresetId)?.container || 'mp4';
-                                                    const finalName = cleanName.replace(/\.mp4$/, `.${currentContainer}`);
+                                                    if (!file.metadata) {
+                                                        console.error("No metadata available for file");
+                                                        return;
+                                                    }
 
-                                                    updateFileSettings(file.id, { outputName: finalName });
+                                                    // Get current container
+                                                    const currentContainer = file.conversionSettings?.container || availablePresets.find(p => p.id === defaultPresetId)?.container || 'mp4';
+                                                    
+                                                    // Get output video codec (from settings or default preset)
+                                                    let outputVideoCodec = file.conversionSettings?.videoCodec;
+                                                    if (!outputVideoCodec || outputVideoCodec === 'default') {
+                                                        const defaultPreset = availablePresets.find(p => p.id === defaultPresetId);
+                                                        outputVideoCodec = defaultPreset?.video?.codec;
+                                                    }
+
+                                                    // Generate smart filename with metadata
+                                                    const smartName = await invoke<string>('generate_smart_filename_command', {
+                                                        filename: file.name,
+                                                        metadata: file.metadata,
+                                                        outputVideoCodec: outputVideoCodec || null,
+                                                        container: currentContainer
+                                                    });
+
+                                                    updateFileSettings(file.id, { outputName: smartName });
                                                 } catch (e) {
-                                                    console.error("Failed to clean filename", e);
+                                                    console.error("Failed to generate smart filename", e);
                                                 }
                                             }}
                                             className="p-1.5 rounded-md border hover:bg-primary/10 hover:text-primary transition-colors"
-                                            title="Auto-Rename (Smart Clean)"
+                                            title="Auto-Rename (Smart with Metadata)"
                                         >
                                             <Wand2 className="w-3 h-3" />
                                         </button>
@@ -424,7 +483,7 @@ const FileItem = React.memo(({
 export const VideoList: React.FC = () => {
     const { files, removeFile, updateStatus, updateFileSettings, updateMetadata, updateProgress } = useVideoStore();
     const [expandedFileId, setExpandedFileId] = React.useState<string | null>(null);
-    const [conversionDetails, setConversionDetails] = React.useState<Record<string, { fps: number, time: string, speed: string }>>({});
+    const [conversionDetails, setConversionDetails] = React.useState<Record<string, { fps: number, time: string, elapsed_time: string, speed: string, time_remaining?: string }>>({});
 
     // Metadata Search State
     const [searchDialogState, setSearchDialogState] = React.useState<{ isOpen: boolean, fileId: string | null, query: string }>({
@@ -436,29 +495,36 @@ export const VideoList: React.FC = () => {
     const [availablePresets, setAvailablePresets] = React.useState<any[]>([]);
     const [defaultPresetId, setDefaultPresetId] = React.useState<string>('default-high');
 
-    React.useEffect(() => {
-        const loadPresets = async () => {
-            try {
-                const store = await Store.load('settings.json');
-                const presets = await store.get<any[]>('presets');
-                const defId = await store.get<string>('default_preset_id');
+    const loadPresets = React.useCallback(async () => {
+        try {
+            const store = await Store.load('settings.json');
+            const presets = await store.get<any[]>('presets');
+            const defId = await store.get<string>('default_preset_id');
 
-                if (defId) setDefaultPresetId(defId);
+            if (defId) setDefaultPresetId(defId);
 
-                if (presets) {
-                    setAvailablePresets(presets);
-                } else {
-                    // Fallback if not yet saved
-                    setAvailablePresets([
-                        { id: 'default-high', name: 'High Quality (H.264)', container: 'mp4' },
-                        { id: 'fast-gpu', name: 'Fast GPU (NVENC)', container: 'mp4' }
-                    ]);
-                }
-            } catch (e) {
-                console.error("Failed to load presets", e);
+            if (presets) {
+                setAvailablePresets(presets);
+            } else {
+                // Fallback if not yet saved
+                setAvailablePresets([
+                    { id: 'default-high', name: 'High Quality (H.264)', container: 'mp4' },
+                    { id: 'fast-gpu', name: 'Fast GPU (NVENC)', container: 'mp4' }
+                ]);
             }
-        };
+        } catch (e) {
+            console.error("Failed to load presets", e);
+        }
+    }, []);
+
+    React.useEffect(() => {
         loadPresets();
+
+        // Listen for preset updates from SettingsDialog
+        const handlePresetsUpdated = () => {
+            loadPresets();
+        };
+        window.addEventListener('presets-updated', handlePresetsUpdated);
 
         const unlisten = getCurrentWebview().listen('conversion_progress', (event: any) => {
             const payload = event.payload;
@@ -470,16 +536,19 @@ export const VideoList: React.FC = () => {
                     [payload.id]: {
                         fps: payload.fps,
                         time: payload.time,
-                        speed: payload.speed
+                        elapsed_time: payload.elapsed_time,
+                        speed: payload.speed,
+                        time_remaining: payload.time_remaining
                     }
                 }));
             }
         });
 
         return () => {
+            window.removeEventListener('presets-updated', handlePresetsUpdated);
             unlisten.then(f => f());
         };
-    }, []);
+    }, [loadPresets, updateProgress]);
 
     const toggleExpand = (id: string) => {
         setExpandedFileId(prev => prev === id ? null : id);
@@ -537,15 +606,31 @@ export const VideoList: React.FC = () => {
                     // ... (existing logic)
 
                     if (outputDir) {
-                        // Ensure no double slashes, simple join
-                        const separator = outputDir.endsWith('/') ? '' : '/';
-                        outputPath = `${outputDir}${separator}${finalFilename}`;
+                        // Normalize path separators for Windows
+                        const normalizedDir = outputDir.replace(/\\/g, '/');
+                        const separator = normalizedDir.endsWith('/') ? '' : '/';
+                        outputPath = `${normalizedDir}${separator}${finalFilename}`;
                     } else {
                         // Same directory as input
-                        const lastSlash = file.path.lastIndexOf('/');
-                        const dir = lastSlash !== -1 ? file.path.substring(0, lastSlash + 1) : './';
+                        const normalizedPath = file.path.replace(/\\/g, '/');
+                        const lastSlash = normalizedPath.lastIndexOf('/');
+                        const dir = lastSlash !== -1 ? normalizedPath.substring(0, lastSlash + 1) : './';
                         outputPath = `${dir}${finalFilename}`;
                     }
+
+                    // Ensure crf is a valid number (0-51)
+                    const crfValue = file.conversionSettings?.crf ?? defaultPreset.video.crf ?? 23;
+                    const crf = typeof crfValue === 'number' && crfValue >= 0 && crfValue <= 51 
+                        ? Math.round(crfValue) as number 
+                        : 23;
+
+                    console.log(`Starting conversion for ${file.name}:`, {
+                        input: file.path,
+                        output: outputPath,
+                        videoCodec: file.conversionSettings?.videoCodec || defaultPreset.video.codec,
+                        crf,
+                        duration: file.duration
+                    });
 
                     invoke('convert_video_command', {
                         options: {
@@ -556,19 +641,21 @@ export const VideoList: React.FC = () => {
                             audio_track_index: null, // Default
                             subtitle_track_index: null, // Default
                             duration_seconds: file.duration,
+                            total_frames: file.totalFrames || null,
                             audio_strategy: file.conversionSettings?.audioStrategy || defaultPreset.audio.strategy || 'first_track',
                             subtitle_strategy: file.conversionSettings?.subtitleStrategy || defaultPreset.subtitle?.strategy || 'ignore',
                             audio_codec: file.conversionSettings?.audioCodec || defaultPreset.audio.codec || 'aac',
                             audio_bitrate: file.conversionSettings?.audioBitrate || defaultPreset.audio.bitrate || '128k',
-                            crf: file.conversionSettings?.crf || defaultPreset.video.crf,
+                            crf: crf,
                             preset: file.conversionSettings?.preset || defaultPreset.video.preset,
                             profile: file.conversionSettings?.profile,
                             tune: file.conversionSettings?.tune
                         }
                     }).then(() => {
+                        console.log(`Conversion completed for ${file.name}`);
                         updateStatus(file.id, 'completed');
                     }).catch((e) => {
-                        console.error('Conversion failed', e);
+                        console.error(`Conversion failed for ${file.name}:`, e);
                         // If cancelled manually, it might throw an error or just exit.
                         // We might want to handle 'cancelled' status if we add it.
                         updateStatus(file.id, 'error');
@@ -611,6 +698,7 @@ export const VideoList: React.FC = () => {
                         openSearchDialog={openSearchDialog}
                         availablePresets={availablePresets}
                         defaultPresetId={defaultPresetId}
+                        updateStatus={updateStatus}
                     />
                 ))}
             </AnimatePresence>

@@ -21,6 +21,7 @@ export interface FileItem {
     path: string;
     size: string;
     duration: number; // in seconds
+    totalFrames?: number; // Total number of frames in the video
     progress: number; // 0-100
     status: 'idle' | 'converting' | 'completed' | 'error';
     metadata?: any; // Placeholder for full metadata

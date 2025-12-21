@@ -87,6 +87,9 @@ export const SettingsDialog: React.FC = () => {
             await store.set('presets', presets);
             await store.save();
             setIsOpen(false);
+            
+            // Emit event to notify other components that presets have been updated
+            window.dispatchEvent(new CustomEvent('presets-updated'));
         } catch (e) {
             console.error('Failed to save settings', e);
         }
