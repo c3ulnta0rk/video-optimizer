@@ -21,8 +21,21 @@ const GpuStatusBadge = ({ label, active }: { label: string; active: boolean }) =
     </div>
 );
 
-export const SettingsDialog: React.FC = () => {
-    const [isOpen, setIsOpen] = useState(false);
+interface SettingsDialogProps {
+    isOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
+}
+
+export const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen: controlledIsOpen, onOpenChange }) => {
+    const [internalIsOpen, setInternalIsOpen] = useState(false);
+    const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+    const setIsOpen = (open: boolean) => {
+        if (onOpenChange) {
+            onOpenChange(open);
+        } else {
+            setInternalIsOpen(open);
+        }
+    };
     const [activeTab, setActiveTab] = useState<'general' | 'presets'>('general');
 
     // General Settings
@@ -185,13 +198,6 @@ export const SettingsDialog: React.FC = () => {
 
     return (
         <>
-            <button
-                onClick={() => setIsOpen(true)}
-                className="fixed top-4 right-4 p-2 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            >
-                <Settings className="w-6 h-6" />
-            </button>
-
             <AnimatePresence>
                 {isOpen && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
