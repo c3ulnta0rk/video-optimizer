@@ -20,7 +20,8 @@ const FileItem = React.memo(({
     openSearchDialog,
     availablePresets,
     defaultPresetId,
-    updateStatus
+    updateStatus,
+    startNextConversion
 }: {
     file: any,
     expandedFileId: string | null,
@@ -31,7 +32,8 @@ const FileItem = React.memo(({
     openSearchDialog: (id: string) => void,
     availablePresets: any[],
     defaultPresetId: string,
-    updateStatus: (id: string, status: 'idle' | 'converting' | 'completed' | 'error') => void
+    updateStatus: (id: string, status: 'idle' | 'queued' | 'converting' | 'completed' | 'error') => void,
+    startNextConversion: () => void
 }) => {
     const isExpanded = expandedFileId === file.id;
     const details = conversionDetails[file.id];
@@ -53,12 +55,17 @@ const FileItem = React.memo(({
                 }`}
         >
             {/* Progress Background */}
-            {(file.status === 'converting' || file.status === 'completed') && (
+            {(file.status === 'converting' || file.status === 'completed' || file.status === 'queued') && (
                 <div
-                    className={`absolute inset-0 opacity-5 transition-all duration-1000 ${file.status === 'completed' ? 'bg-green-500/20' : 'bg-primary/10'
-                        }`}
+                    className={`absolute inset-0 opacity-5 transition-all duration-1000 ${
+                        file.status === 'completed' ? 'bg-green-500/20' : 
+                        file.status === 'queued' ? 'bg-yellow-500/20' :
+                        'bg-primary/10'
+                    }`}
                     style={{
-                        width: file.status === 'completed' ? '100%' : `${file.progress}%`,
+                        width: file.status === 'completed' ? '100%' : 
+                               file.status === 'queued' ? '100%' :
+                               `${file.progress}%`,
                     }}
                 />
             )}
@@ -74,10 +81,12 @@ const FileItem = React.memo(({
                                 className="w-full h-full object-cover"
                             />
                         ) : (
-                            <FileVideo className={`w-6 h-6 ${file.status === 'completed' ? 'text-green-500' :
+                            <FileVideo className={`w-6 h-6 ${
+                                file.status === 'completed' ? 'text-green-500' :
                                 file.status === 'error' ? 'text-destructive' :
-                                    'text-primary/70'
-                                }`} />
+                                file.status === 'queued' ? 'text-yellow-500' :
+                                'text-primary/70'
+                            }`} />
                         )}
                         {file.status === 'completed' && (
                             <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center backdrop-blur-[1px]">
@@ -95,6 +104,11 @@ const FileItem = React.memo(({
                             {file.tmdbId && (
                                 <span className="px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-500 text-[10px] font-bold border border-yellow-500/20">
                                     TMDB
+                                </span>
+                            )}
+                            {file.status === 'queued' && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-500 text-[10px] font-medium border border-yellow-500/20">
+                                    En attente
                                 </span>
                             )}
                         </div>
@@ -159,14 +173,16 @@ const FileItem = React.memo(({
                     <div className="flex items-center gap-2 shrink-0">
                         {file.status === 'converting' && (
                             <button
-                                onClick={async () => {
-                                    try {
-                                        await invoke('cancel_conversion_command', { id: file.id });
-                                        updateStatus(file.id, 'idle');
-                                    } catch (e) {
-                                        console.error('Failed to cancel conversion', e);
-                                    }
-                                }}
+                            onClick={async () => {
+                                try {
+                                    await invoke('cancel_conversion_command', { id: file.id });
+                                    updateStatus(file.id, 'idle');
+                                    // Start next conversion in queue
+                                    startNextConversion();
+                                } catch (e) {
+                                    console.error('Failed to cancel conversion', e);
+                                }
+                            }}
                                 className="p-2 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
                                 title="Arrêter la conversion"
                             >
@@ -565,15 +581,24 @@ export const VideoList: React.FC = () => {
         }
     };
 
-    const startConversion = async () => {
+    // Function to start the next conversion in the queue
+    const startNextConversion = async () => {
+        // Check if there's already a conversion running
+        const isConverting = files.some(f => f.status === 'converting');
+        if (isConverting) {
+            return; // Already converting, don't start another
+        }
+
+        // Find the first file in queue
+        const nextFile = files.find(f => f.status === 'queued');
+        if (!nextFile) {
+            return; // No files in queue
+        }
+
         try {
             const store = await Store.load('settings.json');
             const defaultPresetId = await store.get<string>('default_preset_id') || 'default-high';
             const presets = await store.get<any[]>('presets') || [];
-            // We need to import DEFAULT_PRESETS or duplicate logic if store is empty, 
-            // but store should have presets if saved. If not, use hardcoded fallback.
-            // Ideally we should import DEFAULT_PRESETS from types/preset but dynamic import might be tricky if not exported.
-            // Let's assume store has them or we fallback safely.
 
             const defaultPreset = presets.find((p: any) => p.id === defaultPresetId) || presets[0] || {
                 video: { codec: 'libx264', preset: 'medium', crf: 23 },
@@ -584,87 +609,103 @@ export const VideoList: React.FC = () => {
 
             const globalOutputDir = await store.get<string>('default_output_dir');
 
-            for (const file of files) {
-                if (file.status === 'idle') {
-                    updateStatus(file.id, 'converting');
+            // Mark as converting
+            updateStatus(nextFile.id, 'converting');
 
-                    // Determine Output Directory
-                    let outputDir = file.conversionSettings?.outputDir || globalOutputDir;
+            // Determine Output Directory
+            let outputDir = nextFile.conversionSettings?.outputDir || globalOutputDir;
 
-                    // Construct output path
-                    // If outputDir is set, use it. Otherwise use input file's directory.
-                    let outputPath = '';
+            // Construct output path
+            // If outputDir is set, use it. Otherwise use input file's directory.
+            let outputPath = '';
 
-                    // Determine filename
-                    let finalFilename = file.conversionSettings?.outputName;
-                    if (!finalFilename) {
-                        const originalName = file.name.replace(/(\.[\w\d]+)$/, ''); // Remove extension
-                        const ext = file.conversionSettings?.container || defaultPreset.container || 'mp4';
-                        finalFilename = `${originalName}_optimized.${ext}`;
-                    }
-                    // Ensure extension
-                    // ... (existing logic)
-
-                    if (outputDir) {
-                        // Normalize path separators for Windows
-                        const normalizedDir = outputDir.replace(/\\/g, '/');
-                        const separator = normalizedDir.endsWith('/') ? '' : '/';
-                        outputPath = `${normalizedDir}${separator}${finalFilename}`;
-                    } else {
-                        // Same directory as input
-                        const normalizedPath = file.path.replace(/\\/g, '/');
-                        const lastSlash = normalizedPath.lastIndexOf('/');
-                        const dir = lastSlash !== -1 ? normalizedPath.substring(0, lastSlash + 1) : './';
-                        outputPath = `${dir}${finalFilename}`;
-                    }
-
-                    // Ensure crf is a valid number (0-51)
-                    const crfValue = file.conversionSettings?.crf ?? defaultPreset.video.crf ?? 23;
-                    const crf = typeof crfValue === 'number' && crfValue >= 0 && crfValue <= 51 
-                        ? Math.round(crfValue) as number 
-                        : 23;
-
-                    console.log(`Starting conversion for ${file.name}:`, {
-                        input: file.path,
-                        output: outputPath,
-                        videoCodec: file.conversionSettings?.videoCodec || defaultPreset.video.codec,
-                        crf,
-                        duration: file.duration
-                    });
-
-                    invoke('convert_video_command', {
-                        options: {
-                            id: file.id, // Pass ID
-                            input_path: file.path,
-                            output_path: outputPath,
-                            video_codec: file.conversionSettings?.videoCodec || defaultPreset.video.codec,
-                            audio_track_index: null, // Default
-                            subtitle_track_index: null, // Default
-                            duration_seconds: file.duration,
-                            total_frames: file.totalFrames || null,
-                            audio_strategy: file.conversionSettings?.audioStrategy || defaultPreset.audio.strategy || 'first_track',
-                            subtitle_strategy: file.conversionSettings?.subtitleStrategy || defaultPreset.subtitle?.strategy || 'ignore',
-                            audio_codec: file.conversionSettings?.audioCodec || defaultPreset.audio.codec || 'aac',
-                            audio_bitrate: file.conversionSettings?.audioBitrate || defaultPreset.audio.bitrate || '128k',
-                            crf: crf,
-                            preset: file.conversionSettings?.preset || defaultPreset.video.preset,
-                            profile: file.conversionSettings?.profile,
-                            tune: file.conversionSettings?.tune
-                        }
-                    }).then(() => {
-                        console.log(`Conversion completed for ${file.name}`);
-                        updateStatus(file.id, 'completed');
-                    }).catch((e) => {
-                        console.error(`Conversion failed for ${file.name}:`, e);
-                        // If cancelled manually, it might throw an error or just exit.
-                        // We might want to handle 'cancelled' status if we add it.
-                        updateStatus(file.id, 'error');
-                    });
-                }
+            // Determine filename
+            let finalFilename = nextFile.conversionSettings?.outputName;
+            if (!finalFilename) {
+                const originalName = nextFile.name.replace(/(\.[\w\d]+)$/, ''); // Remove extension
+                const ext = nextFile.conversionSettings?.container || defaultPreset.container || 'mp4';
+                finalFilename = `${originalName}_optimized.${ext}`;
             }
+            // Ensure extension
+            // ... (existing logic)
+
+            if (outputDir) {
+                // Normalize path separators for Windows
+                const normalizedDir = outputDir.replace(/\\/g, '/');
+                const separator = normalizedDir.endsWith('/') ? '' : '/';
+                outputPath = `${normalizedDir}${separator}${finalFilename}`;
+            } else {
+                // Same directory as input
+                const normalizedPath = nextFile.path.replace(/\\/g, '/');
+                const lastSlash = normalizedPath.lastIndexOf('/');
+                const dir = lastSlash !== -1 ? normalizedPath.substring(0, lastSlash + 1) : './';
+                outputPath = `${dir}${finalFilename}`;
+            }
+
+            // Ensure crf is a valid number (0-51)
+            const crfValue = nextFile.conversionSettings?.crf ?? defaultPreset.video.crf ?? 23;
+            const crf = typeof crfValue === 'number' && crfValue >= 0 && crfValue <= 51 
+                ? Math.round(crfValue) as number 
+                : 23;
+
+            console.log(`Starting conversion for ${nextFile.name}:`, {
+                input: nextFile.path,
+                output: outputPath,
+                videoCodec: nextFile.conversionSettings?.videoCodec || defaultPreset.video.codec,
+                crf,
+                duration: nextFile.duration
+            });
+
+            invoke('convert_video_command', {
+                options: {
+                    id: nextFile.id, // Pass ID
+                    input_path: nextFile.path,
+                    output_path: outputPath,
+                    video_codec: nextFile.conversionSettings?.videoCodec || defaultPreset.video.codec,
+                    audio_track_index: null, // Default
+                    subtitle_track_index: null, // Default
+                    duration_seconds: nextFile.duration,
+                    total_frames: nextFile.totalFrames || null,
+                    audio_strategy: nextFile.conversionSettings?.audioStrategy || defaultPreset.audio.strategy || 'first_track',
+                    subtitle_strategy: nextFile.conversionSettings?.subtitleStrategy || defaultPreset.subtitle?.strategy || 'ignore',
+                    audio_codec: nextFile.conversionSettings?.audioCodec || defaultPreset.audio.codec || 'aac',
+                    audio_bitrate: nextFile.conversionSettings?.audioBitrate || defaultPreset.audio.bitrate || '128k',
+                    crf: crf,
+                    preset: nextFile.conversionSettings?.preset || defaultPreset.video.preset,
+                    profile: nextFile.conversionSettings?.profile,
+                    tune: nextFile.conversionSettings?.tune
+                }
+            }).then(() => {
+                console.log(`Conversion completed for ${nextFile.name}`);
+                updateStatus(nextFile.id, 'completed');
+                // Start next conversion in queue
+                startNextConversion();
+            }).catch((e) => {
+                console.error(`Conversion failed for ${nextFile.name}:`, e);
+                // If cancelled manually, it might throw an error or just exit.
+                updateStatus(nextFile.id, 'error');
+                // Start next conversion in queue even if this one failed
+                startNextConversion();
+            });
         } catch (e) {
             console.error('Failed to start conversion', e);
+            // If we failed to start, mark as error and try next
+            updateStatus(nextFile.id, 'error');
+            startNextConversion();
         }
+    };
+
+    // Function to queue all idle files for conversion
+    const startConversion = async () => {
+        // Put all idle files in queue
+        for (const file of files) {
+            if (file.status === 'idle') {
+                updateStatus(file.id, 'queued');
+            }
+        }
+        
+        // Start the first conversion
+        startNextConversion();
     };
 
 
@@ -672,7 +713,7 @@ export const VideoList: React.FC = () => {
     return (
         <div className="mt-8 space-y-4">
             <div className="flex justify-end">
-                {files.some(f => f.status === 'idle') && (
+                {files.some(f => f.status === 'idle' || f.status === 'queued') && (
                     <motion.button
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -699,6 +740,7 @@ export const VideoList: React.FC = () => {
                         availablePresets={availablePresets}
                         defaultPresetId={defaultPresetId}
                         updateStatus={updateStatus}
+                        startNextConversion={startNextConversion}
                     />
                 ))}
             </AnimatePresence>

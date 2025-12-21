@@ -23,7 +23,7 @@ export interface FileItem {
     duration: number; // in seconds
     totalFrames?: number; // Total number of frames in the video
     progress: number; // 0-100
-    status: 'idle' | 'converting' | 'completed' | 'error';
+    status: 'idle' | 'queued' | 'converting' | 'completed' | 'error';
     metadata?: any; // Placeholder for full metadata
     tmdbId?: number;
     posterPath?: string;
