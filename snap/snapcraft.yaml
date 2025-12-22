@@ -12,6 +12,8 @@ website: https://github.com/kroenen/video-optimizer
 source-code: https://github.com/kroenen/video-optimizer
 issues: https://github.com/kroenen/video-optimizer/issues
 
+icon: snap/gui/video-optimizer.png
+
 grade: stable
 confinement: strict
 
@@ -19,6 +21,7 @@ apps:
   video-optimizer:
     command: usr/bin/video-optimizer
     extensions: [gnome]
+    desktop: snap/gui/video-optimizer.desktop
     plugs:
       - home
       - removable-media
@@ -38,8 +41,6 @@ parts:
     source-type: deb
     stage-packages:
       - libwebkit2gtk-4.1-0
-      - libgtk-3-0
       - libayatana-appindicator3-1
-      - librsvg2-2
       - libssl3
       - ffmpeg # Include ffmpeg in the snap

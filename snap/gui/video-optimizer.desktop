@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Video Optimizer
+Comment=A powerful video converter and optimizer.
+Exec=video-optimizer
+Icon=${SNAP}/meta/gui/video-optimizer.png
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;
