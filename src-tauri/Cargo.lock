@@ -4797,6 +4797,7 @@ name = "video-optimizer"
 version = "1.0.0"
 dependencies = [
  "once_cell",
+ "raw-window-handle",
  "regex",
  "reqwest",
  "serde",

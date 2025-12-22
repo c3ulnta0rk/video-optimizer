@@ -107,8 +107,6 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Note: Blur effect will be applied from frontend after window loads
-            // This ensures the window handle is fully initialized
 
             Ok(())
         })
@@ -121,8 +119,7 @@ pub fn run() {
             generate_smart_filename_command,
             get_gpu_capabilities_command,
             generate_filename_command,
-            search_movie_command,
-            modules::window_blur::apply_window_blur
+            search_movie_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

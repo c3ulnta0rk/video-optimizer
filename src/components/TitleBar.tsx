@@ -44,7 +44,7 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
   };
 
   return (
-    <div className="flex items-center justify-between h-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border px-4 select-none cursor-grab">
+    <div className="flex items-center justify-between h-10 bg-background/25 border-b border-border/30 px-4 select-none cursor-grab">
       <div className="flex items-center gap-2 flex-1" data-tauri-drag-region>
         <h2 className="text-sm font-semibold text-foreground">Video Optimizer</h2>
       </div>
