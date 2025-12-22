@@ -1,6 +1,7 @@
 name: video-optimizer
 base: core24
 version: '1.0.0'
+compression: lzo
 summary: A powerful video converter and optimizer.
 description: |
   Video Optimizer is a modern, high-performance tool for converting and optimizing videos.
@@ -21,7 +22,6 @@ apps:
   video-optimizer:
     command: usr/bin/video-optimizer
     extensions: [gnome]
-    desktop: snap/gui/video-optimizer.desktop
     plugs:
       - home
       - removable-media
