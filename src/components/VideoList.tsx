@@ -8,6 +8,9 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { documentDir } from '@tauri-apps/api/path';
 import { Store } from '@tauri-apps/plugin-store';
 import { MetadataSearchDialog } from './MetadataSearchDialog';
+import { Select } from './ui/Select';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
 
 // Extract FileItem to a memoized component to prevent re-renders of all items when one changes
 const FileItem = React.memo(({
@@ -57,15 +60,14 @@ const FileItem = React.memo(({
             {/* Progress Background */}
             {(file.status === 'converting' || file.status === 'completed' || file.status === 'queued') && (
                 <div
-                    className={`absolute inset-0 opacity-5 transition-all duration-1000 ${
-                        file.status === 'completed' ? 'bg-green-500/20' : 
+                    className={`absolute inset-0 opacity-5 transition-all duration-1000 ${file.status === 'completed' ? 'bg-green-500/20' :
                         file.status === 'queued' ? 'bg-yellow-500/20' :
-                        'bg-primary/10'
-                    }`}
+                            'bg-primary/10'
+                        }`}
                     style={{
-                        width: file.status === 'completed' ? '100%' : 
-                               file.status === 'queued' ? '100%' :
-                               `${file.progress}%`,
+                        width: file.status === 'completed' ? '100%' :
+                            file.status === 'queued' ? '100%' :
+                                `${file.progress}%`,
                     }}
                 />
             )}
@@ -81,12 +83,11 @@ const FileItem = React.memo(({
                                 className="w-full h-full object-cover"
                             />
                         ) : (
-                            <FileVideo className={`w-6 h-6 ${
-                                file.status === 'completed' ? 'text-green-500' :
+                            <FileVideo className={`w-6 h-6 ${file.status === 'completed' ? 'text-green-500' :
                                 file.status === 'error' ? 'text-destructive' :
-                                file.status === 'queued' ? 'text-yellow-500' :
-                                'text-primary/70'
-                            }`} />
+                                    file.status === 'queued' ? 'text-yellow-500' :
+                                        'text-primary/70'
+                                }`} />
                         )}
                         {file.status === 'completed' && (
                             <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center backdrop-blur-[1px]">
@@ -172,43 +173,50 @@ const FileItem = React.memo(({
                     {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0">
                         {file.status === 'converting' && (
-                            <button
-                            onClick={async () => {
-                                try {
-                                    await invoke('cancel_conversion_command', { id: file.id });
-                                    updateStatus(file.id, 'idle');
-                                    // Start next conversion in queue
-                                    startNextConversion();
-                                } catch (e) {
-                                    console.error('Failed to cancel conversion', e);
-                                }
-                            }}
-                                className="p-2 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={async () => {
+                                    try {
+                                        await invoke('cancel_conversion_command', { id: file.id });
+                                        updateStatus(file.id, 'idle');
+                                        // Start next conversion in queue
+                                        startNextConversion();
+                                    } catch (e) {
+                                        console.error('Failed to cancel conversion', e);
+                                    }
+                                }}
+                                className="hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-full"
                                 title="Arrêter la conversion"
                             >
                                 <X className="w-4 h-4" />
-                            </button>
+                            </Button>
                         )}
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => openSearchDialog(file.id)}
-                            className="p-2 rounded-full hover:bg-primary/10 hover:text-primary transition-colors"
+                            className="hover:bg-primary/10 hover:text-primary rounded-full transition-colors"
                             title="Search Metadata"
                         >
                             <Search className="w-4 h-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => toggleExpand(file.id)}
-                            className={`p-2 rounded-full transition-all duration-300 ${isExpanded ? 'bg-primary/10 text-primary rotate-180' : 'hover:bg-secondary text-muted-foreground'
-                                }`}
+                            className={`rounded-full transition-all duration-300 ${isExpanded ? 'bg-primary/10 text-primary rotate-180' : 'hover:bg-secondary text-muted-foreground'}`}
                         >
                             <SettingsIcon className="w-4 h-4" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => removeFile(file.id)}
-                            className="p-2 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors text-muted-foreground"
+                            className="hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-full"
                         >
                             <Trash2 className="w-4 h-4" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -224,9 +232,10 @@ const FileItem = React.memo(({
                             <div className="pt-4 mt-4 border-t grid grid-cols-2 gap-4 text-sm">
                                 <div className="col-span-2 space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Apply Preset</label>
-                                    <select
-                                        onChange={async (e) => {
-                                            const presetId = e.target.value;
+                                    <Select
+                                        value=""
+                                        onChange={async (val) => {
+                                            const presetId = val;
                                             if (!presetId) return;
 
                                             // Load presets to find the selected one
@@ -252,44 +261,38 @@ const FileItem = React.memo(({
                                                 const newName = currentName.replace(/\.[\w\d]+$/, `.${preset.container}`);
                                                 updateFileSettings(file.id, { outputName: newName });
                                             }
-                                            // Reset select to empty
-                                            e.target.value = "";
                                         }}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
-                                    >
-                                        <option value="">Select a preset to apply...</option>
-                                        {availablePresets.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name}</option>
-                                        ))}
-                                    </select>
+                                        placeholder="Select a preset to apply..."
+                                        options={availablePresets.map(p => ({ value: p.id, label: p.name }))}
+                                    />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Video Codec</label>
-                                    <select
+                                    <Select
                                         value={file.conversionSettings?.videoCodec || 'default'}
-                                        onChange={(e) => updateFileSettings(file.id, { videoCodec: e.target.value })}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
-                                    >
-                                        <option value="default">Default (Global)</option>
-                                        <option value="libx264">H.264 (CPU)</option>
-                                        <option value="libx265">H.265 (CPU)</option>
-                                        <option value="h264_nvenc">H.264 (NVIDIA)</option>
-                                        <option value="hevc_nvenc">H.265 (NVIDIA)</option>
-                                        <option value="h264_qsv">H.264 (Intel QSV)</option>
-                                        <option value="hevc_qsv">H.265 (Intel QSV)</option>
-                                        <option value="h264_vaapi">H.264 (VAAPI)</option>
-                                        <option value="hevc_vaapi">H.265 (VAAPI)</option>
-                                        <option value="h264_videotoolbox">H.264 (Apple)</option>
-                                        <option value="hevc_videotoolbox">H.265 (Apple)</option>
-                                    </select>
+                                        onChange={(val) => updateFileSettings(file.id, { videoCodec: val })}
+                                        options={[
+                                            { value: 'default', label: 'Default (Global)' },
+                                            { value: 'libx264', label: 'H.264 (CPU)' },
+                                            { value: 'libx265', label: 'H.265 (CPU)' },
+                                            { value: 'h264_nvenc', label: 'H.264 (NVIDIA)' },
+                                            { value: 'hevc_nvenc', label: 'H.265 (NVIDIA)' },
+                                            { value: 'h264_qsv', label: 'H.264 (Intel QSV)' },
+                                            { value: 'hevc_qsv', label: 'H.265 (Intel QSV)' },
+                                            { value: 'h264_vaapi', label: 'H.264 (VAAPI)' },
+                                            { value: 'hevc_vaapi', label: 'H.265 (VAAPI)' },
+                                            { value: 'h264_videotoolbox', label: 'H.264 (Apple)' },
+                                            { value: 'hevc_videotoolbox', label: 'H.265 (Apple)' }
+                                        ]}
+                                    />
                                 </div>
 
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Container</label>
-                                    <select
+                                    <Select
                                         value={file.conversionSettings?.container || availablePresets.find(p => p.id === defaultPresetId)?.container || 'mp4'}
-                                        onChange={(e) => {
-                                            const newContainer = e.target.value;
+                                        onChange={(val) => {
+                                            const newContainer = val;
                                             const currentName = file.conversionSettings?.outputName || file.name;
                                             // Replace extension
                                             const newName = currentName.replace(/\.[\w\d]+$/, `.${newContainer}`);
@@ -298,26 +301,26 @@ const FileItem = React.memo(({
                                                 outputName: newName
                                             });
                                         }}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
-                                    >
-                                        <option value="mp4">MP4</option>
-                                        <option value="mkv">MKV</option>
-                                        <option value="avi">AVI</option>
-                                        <option value="mov">MOV</option>
-                                    </select>
+                                        options={[
+                                            { value: 'mp4', label: 'MP4' },
+                                            { value: 'mkv', label: 'MKV' },
+                                            { value: 'avi', label: 'AVI' },
+                                            { value: 'mov', label: 'MOV' }
+                                        ]}
+                                    />
                                 </div>
 
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Audio Strategy</label>
-                                    <select
+                                    <Select
                                         value={file.conversionSettings?.audioStrategy || 'first_track'}
-                                        onChange={(e) => updateFileSettings(file.id, { audioStrategy: e.target.value })}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
-                                    >
-                                        <option value="first_track">First Track</option>
-                                        <option value="copy_all">Copy All Tracks</option>
-                                        <option value="convert_all">Convert All (AAC)</option>
-                                    </select>
+                                        onChange={(val) => updateFileSettings(file.id, { audioStrategy: val })}
+                                        options={[
+                                            { value: 'first_track', label: 'First Track' },
+                                            { value: 'copy_all', label: 'Copy All Tracks' },
+                                            { value: 'convert_all', label: 'Convert All (AAC)' }
+                                        ]}
+                                    />
                                 </div>
 
                                 {/* Audio Codec & Bitrate - Only show if not Copy All */}
@@ -325,43 +328,43 @@ const FileItem = React.memo(({
                                     <>
                                         <div className="space-y-1">
                                             <label className="text-xs font-medium text-muted-foreground">Audio Codec</label>
-                                            <select
+                                            <Select
                                                 value={file.conversionSettings?.audioCodec || 'aac'}
-                                                onChange={(e) => updateFileSettings(file.id, { audioCodec: e.target.value })}
-                                                className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
-                                            >
-                                                <option value="aac">AAC</option>
-                                                <option value="ac3">AC3</option>
-                                                <option value="copy">Copy</option>
-                                            </select>
+                                                onChange={(val) => updateFileSettings(file.id, { audioCodec: val })}
+                                                options={[
+                                                    { value: 'aac', label: 'AAC' },
+                                                    { value: 'ac3', label: 'AC3' },
+                                                    { value: 'copy', label: 'Copy' }
+                                                ]}
+                                            />
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs font-medium text-muted-foreground">Audio Bitrate</label>
-                                            <select
+                                            <Select
                                                 value={file.conversionSettings?.audioBitrate || '128k'}
-                                                onChange={(e) => updateFileSettings(file.id, { audioBitrate: e.target.value })}
-                                                className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
-                                            >
-                                                <option value="64k">64k</option>
-                                                <option value="128k">128k</option>
-                                                <option value="192k">192k</option>
-                                                <option value="320k">320k</option>
-                                            </select>
+                                                onChange={(val) => updateFileSettings(file.id, { audioBitrate: val })}
+                                                options={[
+                                                    { value: '64k', label: '64k' },
+                                                    { value: '128k', label: '128k' },
+                                                    { value: '192k', label: '192k' },
+                                                    { value: '320k', label: '320k' }
+                                                ]}
+                                            />
                                         </div>
                                     </>
                                 )}
 
                                 <div className="space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Subtitle Strategy</label>
-                                    <select
+                                    <Select
                                         value={file.conversionSettings?.subtitleStrategy || 'ignore'}
-                                        onChange={(e) => updateFileSettings(file.id, { subtitleStrategy: e.target.value })}
-                                        className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
-                                    >
-                                        <option value="ignore">Ignore</option>
-                                        <option value="copy_all">Copy All</option>
-                                        <option value="burn_in">Burn In (First Track)</option>
-                                    </select>
+                                        onChange={(val) => updateFileSettings(file.id, { subtitleStrategy: val })}
+                                        options={[
+                                            { value: 'ignore', label: 'Ignore' },
+                                            { value: 'copy_all', label: 'Copy All' },
+                                            { value: 'burn_in', label: 'Burn In (First Track)' }
+                                        ]}
+                                    />
                                 </div>
 
                                 {/* Advanced Video Settings */}
@@ -389,35 +392,37 @@ const FileItem = React.memo(({
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-xs font-medium text-muted-foreground">Preset (Speed)</label>
-                                        <select
+                                        <Select
                                             value={file.conversionSettings?.preset || 'medium'}
-                                            onChange={(e) => updateFileSettings(file.id, { preset: e.target.value })}
-                                            className="w-full px-2 py-1.5 rounded-md border bg-background text-foreground text-xs [&>option]:bg-background [&>option]:text-foreground"
-                                        >
-                                            <option value="ultrafast">Ultrafast</option>
-                                            <option value="superfast">Superfast</option>
-                                            <option value="veryfast">Veryfast</option>
-                                            <option value="faster">Faster</option>
-                                            <option value="fast">Fast (Default)</option>
-                                            <option value="medium">Medium</option>
-                                            <option value="slow">Slow</option>
-                                            <option value="slower">Slower</option>
-                                            <option value="veryslow">Veryslow</option>
-                                        </select>
+                                            onChange={(val) => updateFileSettings(file.id, { preset: val })}
+                                            options={[
+                                                { value: 'ultrafast', label: 'Ultrafast' },
+                                                { value: 'superfast', label: 'Superfast' },
+                                                { value: 'veryfast', label: 'Veryfast' },
+                                                { value: 'faster', label: 'Faster' },
+                                                { value: 'fast', label: 'Fast (Default)' },
+                                                { value: 'medium', label: 'Medium' },
+                                                { value: 'slow', label: 'Slow' },
+                                                { value: 'slower', label: 'Slower' },
+                                                { value: 'veryslow', label: 'Veryslow' }
+                                            ]}
+                                        />
                                     </div>
                                 </div>
 
                                 <div className="col-span-2 space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Output Filename</label>
                                     <div className="flex gap-2">
-                                        <input
+                                        <Input
                                             type="text"
                                             value={file.conversionSettings?.outputName || ''}
                                             onChange={(e) => updateFileSettings(file.id, { outputName: e.target.value })}
                                             placeholder={`${file.name.replace(/(\.[\w\d]+)$/, '')}_optimized.${file.conversionSettings?.container || availablePresets.find(p => p.id === defaultPresetId)?.container || 'mp4'}`}
-                                            className="flex-1 px-2 py-1.5 rounded-md border bg-background/50 text-xs"
+                                            className="flex-1 text-xs"
                                         />
-                                        <button
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
                                             onClick={async () => {
                                                 try {
                                                     if (!file.metadata) {
@@ -427,7 +432,7 @@ const FileItem = React.memo(({
 
                                                     // Get current container
                                                     const currentContainer = file.conversionSettings?.container || availablePresets.find(p => p.id === defaultPresetId)?.container || 'mp4';
-                                                    
+
                                                     // Get output video codec (from settings or default preset)
                                                     let outputVideoCodec = file.conversionSettings?.videoCodec;
                                                     if (!outputVideoCodec || outputVideoCodec === 'default') {
@@ -448,24 +453,26 @@ const FileItem = React.memo(({
                                                     console.error("Failed to generate smart filename", e);
                                                 }
                                             }}
-                                            className="p-1.5 rounded-md border hover:bg-primary/10 hover:text-primary transition-colors"
+                                            className="hover:bg-primary/10 hover:text-primary"
                                             title="Auto-Rename (Smart with Metadata)"
                                         >
                                             <Wand2 className="w-3 h-3" />
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                                 <div className="col-span-2 space-y-1">
                                     <label className="text-xs font-medium text-muted-foreground">Output Directory</label>
                                     <div className="flex gap-2">
-                                        <input
+                                        <Input
                                             type="text"
                                             readOnly
                                             value={file.conversionSettings?.outputDir || ''}
                                             placeholder="Default (Same as input or Global Setting)"
-                                            className="flex-1 px-2 py-1.5 rounded-md border bg-background/50 text-xs text-muted-foreground"
+                                            className="flex-1 text-xs text-muted-foreground"
                                         />
-                                        <button
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
                                             onClick={async () => {
                                                 try {
                                                     const selected = await open({
@@ -480,11 +487,11 @@ const FileItem = React.memo(({
                                                     console.error("Failed to pick directory", err);
                                                 }
                                             }}
-                                            className="p-1.5 rounded-md border hover:bg-primary/10 hover:text-primary transition-colors"
+                                            className="hover:bg-primary/10 hover:text-primary"
                                             title="Select Output Folder"
                                         >
                                             <FolderOpen className="w-3 h-3" />
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
@@ -644,8 +651,8 @@ export const VideoList: React.FC = () => {
 
             // Ensure crf is a valid number (0-51)
             const crfValue = nextFile.conversionSettings?.crf ?? defaultPreset.video.crf ?? 23;
-            const crf = typeof crfValue === 'number' && crfValue >= 0 && crfValue <= 51 
-                ? Math.round(crfValue) as number 
+            const crf = typeof crfValue === 'number' && crfValue >= 0 && crfValue <= 51
+                ? Math.round(crfValue) as number
                 : 23;
 
             console.log(`Starting conversion for ${nextFile.name}:`, {
@@ -703,7 +710,7 @@ export const VideoList: React.FC = () => {
                 updateStatus(file.id, 'queued');
             }
         }
-        
+
         // Start the first conversion
         startNextConversion();
     };

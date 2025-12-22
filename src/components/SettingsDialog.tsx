@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, X, Save, Eye, EyeOff, Check, X as XIcon, Plus, Trash2, Edit2, FolderOpen } from 'lucide-react';
+import { Save, Eye, EyeOff, Check, X as XIcon, Plus, Trash2, Edit2, FolderOpen } from 'lucide-react';
 import { Store } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Preset, DEFAULT_PRESETS } from '../types/preset';
+import { Select } from './ui/Select';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogBody } from './ui/Dialog';
 
 interface GpuCapabilities {
     has_nvenc: boolean;
@@ -100,7 +103,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen: controll
             await store.set('presets', presets);
             await store.save();
             setIsOpen(false);
-            
+
             // Emit event to notify other components that presets have been updated
             window.dispatchEvent(new CustomEvent('presets-updated'));
         } catch (e) {
@@ -197,390 +200,359 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({ isOpen: controll
     };
 
     return (
-        <>
-            <AnimatePresence>
-                {isOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            className="w-full max-w-2xl bg-background border rounded-xl shadow-lg flex flex-col max-h-[80vh]"
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+                <DialogHeader>
+                    <DialogTitle>{editingPreset ? (editingPreset.id === 'new' ? 'New Preset' : 'Edit Preset') : 'Settings'}</DialogTitle>
+                </DialogHeader>
+
+                {!editingPreset && (
+                    <div className="flex border-b px-6">
+                        <button
+                            onClick={() => setActiveTab('general')}
+                            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                         >
-                            <div className="flex items-center justify-between p-6 border-b">
-                                <h2 className="text-xl font-semibold">
-                                    {editingPreset ? (editingPreset.id === 'new' ? 'New Preset' : 'Edit Preset') : 'Settings'}
-                                </h2>
-                                <button
-                                    onClick={() => {
-                                        if (editingPreset) setEditingPreset(null);
-                                        else setIsOpen(false);
-                                    }}
-                                    className="p-1 rounded-md hover:bg-muted transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-
-                            {!editingPreset && (
-                                <div className="flex border-b">
-                                    <button
-                                        onClick={() => setActiveTab('general')}
-                                        className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                                    >
-                                        General
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveTab('presets')}
-                                        className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'presets' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                                    >
-                                        Presets
-                                    </button>
-                                </div>
-                            )}
-
-                            <div className="p-6 overflow-y-auto flex-1">
-                                {editingPreset ? (
-                                    <div className="space-y-4">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Name</label>
-                                            <input
-                                                type="text"
-                                                value={editingPreset.name}
-                                                onChange={e => setEditingPreset({ ...editingPreset, name: e.target.value })}
-                                                className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                placeholder="My Custom Preset"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Description</label>
-                                            <input
-                                                type="text"
-                                                value={editingPreset.description || ''}
-                                                onChange={e => setEditingPreset({ ...editingPreset, description: e.target.value })}
-                                                className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                placeholder="Optional description"
-                                            />
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Container</label>
-                                                <select
-                                                    value={editingPreset.container}
-                                                    onChange={e => setEditingPreset({ ...editingPreset, container: e.target.value as any })}
-                                                    className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                >
-                                                    <option value="mp4" className="bg-background">MP4</option>
-                                                    <option value="mkv" className="bg-background">MKV</option>
-                                                    <option value="avi" className="bg-background">AVI</option>
-                                                    <option value="mov" className="bg-background">MOV</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Video Codec</label>
-                                                <select
-                                                    value={editingPreset.video.codec}
-                                                    onChange={e => setEditingPreset({ ...editingPreset, video: { ...editingPreset.video, codec: e.target.value } })}
-                                                    className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                >
-                                                    {getAvailableEncoders().map((group) => (
-                                                        <optgroup key={group.label} label={group.label}>
-                                                            {group.options.map((opt) => (
-                                                                <option key={opt.value} value={opt.value} className="bg-background">
-                                                                    {opt.label}
-                                                                </option>
-                                                            ))}
-                                                        </optgroup>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between">
-                                                    <label className="text-sm font-medium">Quality (CRF)</label>
-                                                    <span className="text-xs text-primary font-mono">{editingPreset.video.crf || 23}</span>
-                                                </div>
-                                                <input
-                                                    type="range"
-                                                    min="18"
-                                                    max="28"
-                                                    step="1"
-                                                    value={editingPreset.video.crf || 23}
-                                                    onChange={e => setEditingPreset({ ...editingPreset, video: { ...editingPreset.video, crf: parseInt(e.target.value) } })}
-                                                    className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                                                    title="Lower is better quality, Higher is smaller size"
-                                                />
-                                                <div className="flex justify-between text-[10px] text-muted-foreground">
-                                                    <span>High Quality</span>
-                                                    <span>Small Size</span>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Preset (Speed)</label>
-                                                <select
-                                                    value={editingPreset.video.preset || 'medium'}
-                                                    onChange={e => setEditingPreset({ ...editingPreset, video: { ...editingPreset.video, preset: e.target.value } })}
-                                                    className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                >
-                                                    <option value="ultrafast" className="bg-background">Ultrafast</option>
-                                                    <option value="superfast" className="bg-background">Superfast</option>
-                                                    <option value="veryfast" className="bg-background">Veryfast</option>
-                                                    <option value="faster" className="bg-background">Faster</option>
-                                                    <option value="fast" className="bg-background">Fast</option>
-                                                    <option value="medium" className="bg-background">Medium (Default)</option>
-                                                    <option value="slow" className="bg-background">Slow</option>
-                                                    <option value="slower" className="bg-background">Slower</option>
-                                                    <option value="veryslow" className="bg-background">Veryslow</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Audio Strategy</label>
-                                                <select
-                                                    value={editingPreset.audio.strategy || 'first_track'}
-                                                    onChange={e => setEditingPreset({ ...editingPreset, audio: { ...editingPreset.audio, strategy: e.target.value as any } })}
-                                                    className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                >
-                                                    <option value="first_track" className="bg-background">First Track (Default)</option>
-                                                    <option value="copy_all" className="bg-background">Copy All Tracks</option>
-                                                    <option value="convert_all" className="bg-background">Convert All Tracks</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Subtitle Strategy</label>
-                                                <select
-                                                    value={editingPreset.subtitle?.strategy || 'ignore'}
-                                                    onChange={e => setEditingPreset({ ...editingPreset, subtitle: { ...editingPreset.subtitle, strategy: e.target.value as any } })}
-                                                    className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                >
-                                                    <option value="ignore" className="bg-background">Ignore</option>
-                                                    <option value="copy_all" className="bg-background">Copy All</option>
-                                                    <option value="burn_in" className="bg-background">Burn In (Hardsub)</option>
-                                                </select>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Audio Codec</label>
-                                                <select
-                                                    value={editingPreset.audio.codec}
-                                                    onChange={e => setEditingPreset({ ...editingPreset, audio: { ...editingPreset.audio, codec: e.target.value } })}
-                                                    className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                    disabled={editingPreset.audio.strategy === 'copy_all'}
-                                                >
-                                                    <option value="aac" className="bg-background">AAC</option>
-                                                    <option value="ac3" className="bg-background">AC3</option>
-                                                    <option value="copy" className="bg-background">Copy (Passthrough)</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">Audio Bitrate</label>
-                                                <select
-                                                    value={editingPreset.audio.bitrate || '128k'}
-                                                    onChange={e => setEditingPreset({ ...editingPreset, audio: { ...editingPreset.audio, bitrate: e.target.value } })}
-                                                    className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                    disabled={editingPreset.audio.codec === 'copy' || editingPreset.audio.strategy === 'copy_all'}
-                                                >
-                                                    <option value="64k" className="bg-background">64k</option>
-                                                    <option value="128k" className="bg-background">128k</option>
-                                                    <option value="192k" className="bg-background">192k</option>
-                                                    <option value="320k" className="bg-background">320k</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : activeTab === 'general' ? (
-                                    <div className="space-y-6">
-                                        <div className="space-y-2">
-                                            <label htmlFor="tmdb-key" className="text-sm font-medium">
-                                                TMDB API Key
-                                            </label>
-                                            <div className="relative">
-                                                <input
-                                                    id="tmdb-key"
-                                                    type={showApiKey ? "text" : "password"}
-                                                    value={apiKey}
-                                                    onChange={(e) => setApiKey(e.target.value)}
-                                                    placeholder="Enter your TMDB API Key"
-                                                    className="w-full px-3 py-2 pr-10 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowApiKey(!showApiKey)}
-                                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-                                                >
-                                                    {showApiKey ? (
-                                                        <EyeOff className="w-4 h-4" />
-                                                    ) : (
-                                                        <Eye className="w-4 h-4" />
-                                                    )}
-                                                </button>
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">
-                                                Required for automatic movie metadata and artwork.
-                                            </p>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label htmlFor="preset-select" className="text-sm font-medium">
-                                                Default Preset
-                                            </label>
-                                            <select
-                                                id="preset-select"
-                                                value={defaultPresetId}
-                                                onChange={(e) => setDefaultPresetId(e.target.value)}
-                                                className="w-full px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50"
-                                            >
-                                                {presets.map((preset) => (
-                                                    <option key={preset.id} value={preset.id} className="bg-background">
-                                                        {preset.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <p className="text-xs text-muted-foreground">
-                                                This preset will be applied to all new videos added.
-                                            </p>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Default Output Directory</label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={defaultOutputDir}
-                                                    readOnly
-                                                    placeholder="Same as input file (Default)"
-                                                    className="flex-1 px-3 py-2 rounded-md border bg-transparent focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
-                                                />
-                                                <button
-                                                    onClick={async () => {
-                                                        const selected = await open({
-                                                            directory: true,
-                                                            multiple: false,
-                                                            defaultPath: defaultOutputDir || undefined
-                                                        });
-                                                        if (selected && typeof selected === 'string') {
-                                                            setDefaultOutputDir(selected);
-                                                        } else if (selected === null) {
-                                                            // User cancelled, do nothing or clear? 
-                                                            // Let's allow clearing if they want to reset to default
-                                                        }
-                                                    }}
-                                                    className="p-2 rounded-md border hover:bg-muted transition-colors"
-                                                    title="Select Folder"
-                                                >
-                                                    <FolderOpen className="w-5 h-5" />
-                                                </button>
-                                                {defaultOutputDir && (
-                                                    <button
-                                                        onClick={() => setDefaultOutputDir('')}
-                                                        className="p-2 rounded-md border hover:bg-destructive/10 hover:text-destructive transition-colors"
-                                                        title="Clear (Use Input Directory)"
-                                                    >
-                                                        <Trash2 className="w-5 h-5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <p className="text-xs text-muted-foreground">
-                                                If set, all converted videos will be saved here. Otherwise, they are saved next to the original file.
-                                            </p>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            <h3 className="text-sm font-medium">Hardware Acceleration</h3>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <GpuStatusBadge label="NVIDIA NVENC" active={gpuCaps.has_nvenc} />
-                                                <GpuStatusBadge label="Intel QSV" active={gpuCaps.has_qsv} />
-                                                <GpuStatusBadge label="VAAPI (AMD/Intel)" active={gpuCaps.has_vaapi} />
-                                                <GpuStatusBadge label="macOS VideoToolbox" active={gpuCaps.has_videotoolbox} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <div className="flex justify-between items-center">
-                                            <h3 className="text-sm font-medium">Conversion Presets</h3>
-                                            <button
-                                                onClick={() => setEditingPreset({
-                                                    id: crypto.randomUUID(),
-                                                    name: 'New Preset',
-                                                    container: 'mp4',
-                                                    video: { codec: 'libx264', preset: 'medium', crf: 23 },
-                                                    audio: { codec: 'aac', bitrate: '128k' }
-                                                })}
-                                                className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-1 rounded hover:bg-primary/20 transition-colors"
-                                            >
-                                                <Plus className="w-3 h-3" /> New Preset
-                                            </button>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            {presets.map((preset) => (
-                                                <div key={preset.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow">
-                                                    <div>
-                                                        <div className="font-medium text-sm">{preset.name}</div>
-                                                        <div className="text-xs text-muted-foreground">{preset.description || `${preset.container} • ${preset.video.codec}`}</div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => setEditingPreset(preset)}
-                                                            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
-                                                        >
-                                                            <Edit2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setPresets(prev => prev.filter(p => p.id !== preset.id))}
-                                                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded transition-colors"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="p-6 border-t bg-muted/20">
-                                <div className="flex justify-end gap-2">
-                                    {editingPreset ? (
-                                        <>
-                                            <button
-                                                onClick={() => setEditingPreset(null)}
-                                                className="px-4 py-2 rounded-md text-muted-foreground hover:text-foreground transition-colors"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                onClick={handleSavePreset}
-                                                className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                                            >
-                                                <Save className="w-4 h-4" />
-                                                Save Preset
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <button
-                                            onClick={handleSave}
-                                            className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                                        >
-                                            <Save className="w-4 h-4" />
-                                            Save Changes
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </motion.div>
+                            General
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('presets')}
+                            className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'presets' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        >
+                            Presets
+                        </button>
                     </div>
                 )}
-            </AnimatePresence>
-        </>
+
+                <DialogBody>
+                    {editingPreset ? (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Name</label>
+                                <Input
+                                    type="text"
+                                    value={editingPreset.name}
+                                    onChange={e => setEditingPreset({ ...editingPreset, name: e.target.value })}
+                                    placeholder="My Custom Preset"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Description</label>
+                                <Input
+                                    type="text"
+                                    value={editingPreset.description || ''}
+                                    onChange={e => setEditingPreset({ ...editingPreset, description: e.target.value })}
+                                    placeholder="Optional description"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Container</label>
+                                    <Select
+                                        value={editingPreset.container}
+                                        onChange={(val) => setEditingPreset({ ...editingPreset, container: val as any })}
+                                        options={[
+                                            { value: 'mp4', label: 'MP4' },
+                                            { value: 'mkv', label: 'MKV' },
+                                            { value: 'avi', label: 'AVI' },
+                                            { value: 'mov', label: 'MOV' }
+                                        ]}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Video Codec</label>
+                                    <Select
+                                        value={editingPreset.video.codec}
+                                        onChange={(val) => setEditingPreset({ ...editingPreset, video: { ...editingPreset.video, codec: val } })}
+                                        options={getAvailableEncoders()}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between">
+                                        <label className="text-sm font-medium">Quality (CRF)</label>
+                                        <span className="text-xs text-primary font-mono">{editingPreset.video.crf || 23}</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="18"
+                                        max="28"
+                                        step="1"
+                                        value={editingPreset.video.crf || 23}
+                                        onChange={e => setEditingPreset({ ...editingPreset, video: { ...editingPreset.video, crf: parseInt(e.target.value) } })}
+                                        className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                                        title="Lower is better quality, Higher is smaller size"
+                                    />
+                                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                                        <span>High Quality</span>
+                                        <span>Small Size</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Preset (Speed)</label>
+                                    <Select
+                                        value={editingPreset.video.preset || 'medium'}
+                                        onChange={(val) => setEditingPreset({ ...editingPreset, video: { ...editingPreset.video, preset: val } })}
+                                        options={[
+                                            { value: 'ultrafast', label: 'Ultrafast' },
+                                            { value: 'superfast', label: 'Superfast' },
+                                            { value: 'veryfast', label: 'Veryfast' },
+                                            { value: 'faster', label: 'Faster' },
+                                            { value: 'fast', label: 'Fast' },
+                                            { value: 'medium', label: 'Medium (Default)' },
+                                            { value: 'slow', label: 'Slow' },
+                                            { value: 'slower', label: 'Slower' },
+                                            { value: 'veryslow', label: 'Veryslow' }
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Audio Strategy</label>
+                                    <Select
+                                        value={editingPreset.audio.strategy || 'first_track'}
+                                        onChange={(val) => setEditingPreset({ ...editingPreset, audio: { ...editingPreset.audio, strategy: val as any } })}
+                                        options={[
+                                            { value: 'first_track', label: 'First Track (Default)' },
+                                            { value: 'copy_all', label: 'Copy All Tracks' },
+                                            { value: 'convert_all', label: 'Convert All Tracks' }
+                                        ]}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Subtitle Strategy</label>
+                                    <Select
+                                        value={editingPreset.subtitle?.strategy || 'ignore'}
+                                        onChange={(val) => setEditingPreset({ ...editingPreset, subtitle: { ...editingPreset.subtitle, strategy: val as any } })}
+                                        options={[
+                                            { value: 'ignore', label: 'Ignore' },
+                                            { value: 'copy_all', label: 'Copy All' },
+                                            { value: 'burn_in', label: 'Burn In (Hardsub)' }
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Audio Codec</label>
+                                    <Select
+                                        value={editingPreset.audio.codec}
+                                        onChange={(val) => setEditingPreset({ ...editingPreset, audio: { ...editingPreset.audio, codec: val } })}
+                                        disabled={editingPreset.audio.strategy === 'copy_all'}
+                                        options={[
+                                            { value: 'aac', label: 'AAC' },
+                                            { value: 'ac3', label: 'AC3' },
+                                            { value: 'copy', label: 'Copy (Passthrough)' }
+                                        ]}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Audio Bitrate</label>
+                                    <Select
+                                        value={editingPreset.audio.bitrate || '128k'}
+                                        onChange={(val) => setEditingPreset({ ...editingPreset, audio: { ...editingPreset.audio, bitrate: val } })}
+                                        disabled={editingPreset.audio.codec === 'copy' || editingPreset.audio.strategy === 'copy_all'}
+                                        options={[
+                                            { value: '64k', label: '64k' },
+                                            { value: '128k', label: '128k' },
+                                            { value: '192k', label: '192k' },
+                                            { value: '320k', label: '320k' }
+                                        ]}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : activeTab === 'general' ? (
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <label htmlFor="tmdb-key" className="text-sm font-medium">
+                                    TMDB API Key
+                                </label>
+                                <div className="relative">
+                                    <Input
+                                        id="tmdb-key"
+                                        type={showApiKey ? "text" : "password"}
+                                        value={apiKey}
+                                        onChange={(e) => setApiKey(e.target.value)}
+                                        placeholder="Enter your TMDB API Key"
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowApiKey(!showApiKey)}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                                    >
+                                        {showApiKey ? (
+                                            <EyeOff className="w-4 h-4" />
+                                        ) : (
+                                            <Eye className="w-4 h-4" />
+                                        )}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Required for automatic movie metadata and artwork.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label htmlFor="preset-select" className="text-sm font-medium">
+                                    Default Preset
+                                </label>
+                                <Select
+                                    value={defaultPresetId}
+                                    onChange={(val) => setDefaultPresetId(val)}
+                                    options={presets.map(preset => ({
+                                        value: preset.id,
+                                        label: preset.name
+                                    }))}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    This preset will be applied to all new videos added.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Default Output Directory</label>
+                                <div className="flex gap-2">
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="text"
+                                            value={defaultOutputDir}
+                                            readOnly
+                                            placeholder="Same as input file (Default)"
+                                            className="flex-1"
+                                        />
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={async () => {
+                                                const selected = await open({
+                                                    directory: true,
+                                                    multiple: false,
+                                                    defaultPath: defaultOutputDir || undefined
+                                                });
+                                                if (selected && typeof selected === 'string') {
+                                                    setDefaultOutputDir(selected);
+                                                } else if (selected === null) {
+                                                    // User cancelled, do nothing or clear? 
+                                                    // Let's allow clearing if they want to reset to default
+                                                }
+                                            }}
+                                            title="Select Folder"
+                                        >
+                                            <FolderOpen className="w-5 h-5" />
+                                        </Button>
+                                        {defaultOutputDir && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setDefaultOutputDir('')}
+                                                className="hover:bg-destructive/10 hover:text-destructive"
+                                                title="Clear (Use Input Directory)"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        If set, all converted videos will be saved here. Otherwise, they are saved next to the original file.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="space-y-3">
+                                <h3 className="text-sm font-medium">Hardware Acceleration</h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <GpuStatusBadge label="NVIDIA NVENC" active={gpuCaps.has_nvenc} />
+                                    <GpuStatusBadge label="Intel QSV" active={gpuCaps.has_qsv} />
+                                    <GpuStatusBadge label="VAAPI (AMD/Intel)" active={gpuCaps.has_vaapi} />
+                                    <GpuStatusBadge label="macOS VideoToolbox" active={gpuCaps.has_videotoolbox} />
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <h3 className="text-sm font-medium">Conversion Presets</h3>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setEditingPreset({
+                                        id: crypto.randomUUID(),
+                                        name: 'New Preset',
+                                        container: 'mp4',
+                                        video: { codec: 'libx264', preset: 'medium', crf: 23 },
+                                        audio: { codec: 'aac', bitrate: '128k' }
+                                    })}
+                                    className="h-7 text-xs"
+                                >
+                                    <Plus className="w-3 h-3" /> New Preset
+                                </Button>
+                            </div>
+                            <div className="space-y-2">
+                                {presets.map((preset) => (
+                                    <div key={preset.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:shadow-sm transition-shadow">
+                                        <div>
+                                            <div className="font-medium text-sm">{preset.name}</div>
+                                            <div className="text-xs text-muted-foreground">{preset.description || `${preset.container} • ${preset.video.codec}`}</div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setEditingPreset(preset)}
+                                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                            >
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setPresets(prev => prev.filter(p => p.id !== preset.id))}
+                                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </DialogBody>
+
+                <DialogFooter>
+                    <div className="flex justify-end gap-2 w-full">
+                        {editingPreset ? (
+                            <>
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setEditingPreset(null)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={handleSavePreset}
+                                >
+                                    <Save className="w-4 h-4 mr-2" />
+                                    Save Preset
+                                </Button>
+                            </>
+                        ) : (
+                            <Button
+                                onClick={handleSave}
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                Save Changes
+                            </Button>
+                        )}
+                    </div>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 };

@@ -30,7 +30,7 @@ function App() {
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <div className="flex flex-col h-screen bg-background/95 text-foreground transition-colors duration-300">
+      <div className="flex flex-col h-screen bg-background/95 text-foreground transition-colors duration-300 rounded-xl border border-border overflow-hidden">
         <TitleBar onSettingsClick={() => setIsSettingsOpen(true)} />
         <div className="flex-1 overflow-auto p-8 bg-transparent">
           <SettingsDialog isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />

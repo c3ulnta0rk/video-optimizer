@@ -44,9 +44,9 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
   };
 
   return (
-    <div className="flex items-center justify-between h-10 bg-background/25 border-b border-border/30 px-4 select-none cursor-grab">
+    <div className="flex items-center justify-between h-10 bg-background/25 border-b border-border/30 select-none cursor-grab">
       <div className="flex items-center gap-2 flex-1" data-tauri-drag-region>
-        <h2 className="text-sm font-semibold text-foreground">Video Optimizer</h2>
+        <h2 className="text-sm font-semibold text-foreground px-4">Video Optimizer</h2>
       </div>
 
       <div className="flex items-center gap-1">
@@ -103,11 +103,10 @@ export function TitleBar({ onSettingsClick }: TitleBarProps) {
                       setTheme(item.value as any);
                       setIsThemeOpen(false);
                     }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors text-left ${
-                      theme === item.value
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "hover:bg-muted"
-                    }`}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs transition-colors text-left ${theme === item.value
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "hover:bg-muted"
+                      }`}
                   >
                     <item.icon className="w-3 h-3" />
                     {item.label}
