@@ -6,10 +6,12 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { VideoList } from './VideoList';
 import { useVideoStore, FileItem } from '../store/videoStore';
+import { autoSearchAndAssociateMetadata } from '../utils/metadataUtils';
 
 export const DragDropZone: React.FC = () => {
     const [isDragging, setIsDragging] = useState(false);
     const addFiles = useVideoStore((state) => state.addFiles);
+    const updateMetadata = useVideoStore((state) => state.updateMetadata);
 
     const processFiles = async (paths: string[]) => {
         const newFiles: FileItem[] = [];
@@ -54,6 +56,19 @@ export const DragDropZone: React.FC = () => {
 
         if (newFiles.length > 0) {
             addFiles(newFiles);
+            
+            // Auto-search and associate metadata for each file
+            for (const file of newFiles) {
+                // Run async in background, don't await to avoid blocking
+                // Use file.path to ensure we have the full path (handles Windows backslashes)
+                autoSearchAndAssociateMetadata(
+                    file.path,
+                    (id, metadata) => updateMetadata(id, metadata),
+                    file.id
+                ).catch(error => {
+                    console.error(`Failed to auto-associate metadata for ${file.name}:`, error);
+                });
+            }
         }
     };
 

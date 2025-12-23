@@ -8,25 +8,30 @@ import { useVideoStore } from "./store/videoStore";
 
 function App() {
   const updateProgress = useVideoStore((state) => state.updateProgress);
-  const files = useVideoStore((state) => state.files);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Detect Windows and apply Windows 11 radius
+  useEffect(() => {
+    const isWindows = navigator.platform.toLowerCase().includes('win') || 
+                     navigator.userAgent.toLowerCase().includes('windows');
+    if (isWindows) {
+      document.documentElement.classList.add('windows');
+    }
+  }, []);
 
 
   useEffect(() => {
     const unlisten = listen('conversion_progress', (event: any) => {
-      // TODO: We need to know WHICH file is converting.
-      // For now, let's assume the first 'converting' file or just the first file for demo
-      // In a real app, the event should contain the file ID or we track the active conversion ID
-      const activeFile = files.find(f => f.status === 'converting');
-      if (activeFile) {
-        updateProgress(activeFile.id, event.payload.progress);
+      // The event payload contains the file ID, use it directly
+      if (event.payload?.id) {
+        updateProgress(event.payload.id, event.payload.progress);
       }
     });
 
     return () => {
       unlisten.then(f => f());
     };
-  }, [files, updateProgress]);
+  }, [updateProgress]);
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
