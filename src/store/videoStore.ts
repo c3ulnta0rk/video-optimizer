@@ -58,7 +58,14 @@ export const useVideoStore = create<VideoStore>((set) => ({
     })),
     updateStatus: (id, status) => set((state) => ({
         files: state.files.map((f) =>
-            f.id === id ? { ...f, status } : f
+            f.id === id ? { 
+                ...f, 
+                status,
+                // Reset progress when status changes to idle, queued, or error
+                // Keep progress at 100% for completed files, but reset if going back to queued/idle
+                progress: (status === 'idle' || status === 'queued' || status === 'error') ? 0 : 
+                         (status === 'completed' ? 100 : f.progress)
+            } : f
         )
     })),
     updateFileSettings: (id, settings) => set((state) => ({

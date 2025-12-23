@@ -25,6 +25,8 @@ const FileItem = React.memo(({
     availablePresets,
     defaultPresetId,
     updateStatus,
+    updateProgress,
+    setConversionDetails,
     startNextConversion
 }: {
     file: any,
@@ -37,6 +39,8 @@ const FileItem = React.memo(({
     availablePresets: any[],
     defaultPresetId: string,
     updateStatus: (id: string, status: 'idle' | 'queued' | 'converting' | 'completed' | 'error') => void,
+    updateProgress: (id: string, progress: number) => void,
+    setConversionDetails: React.Dispatch<React.SetStateAction<Record<string, { fps: number, time: string, elapsed_time: string, speed: string, time_remaining?: string }>>>,
     startNextConversion: () => void
 }) => {
     const isExpanded = expandedFileId === file.id;
@@ -61,7 +65,7 @@ const FileItem = React.memo(({
             {/* Progress Background */}
             {(file.status === 'converting' || file.status === 'completed' || file.status === 'queued') && (
                 <div
-                    className={`absolute inset-0 opacity-5 transition-all duration-1000 ${file.status === 'completed' ? 'bg-green-500/20' :
+                    className={`absolute inset-0 opacity-5 transition-all duration-1000 pointer-events-none ${file.status === 'completed' ? 'bg-green-500/20' :
                         file.status === 'queued' ? 'bg-yellow-500/20' :
                             'bg-primary/10'
                         }`}
@@ -179,18 +183,65 @@ const FileItem = React.memo(({
                                 size="icon"
                                 onClick={async () => {
                                     try {
+                                        console.log(`Cancelling conversion for ${file.name} (ID: ${file.id})`);
                                         await invoke('cancel_conversion_command', { id: file.id });
                                         updateStatus(file.id, 'idle');
-                                        // Start next conversion in queue
-                                        startNextConversion();
+                                        // Reset progress to 0
+                                        updateProgress(file.id, 0);
+                                        // Clear conversion details for this file
+                                        setConversionDetails(prev => {
+                                            const next = { ...prev };
+                                            delete next[file.id];
+                                            return next;
+                                        });
+                                        // Start next conversion in queue after a short delay
+                                        setTimeout(() => {
+                                            startNextConversion();
+                                        }, 200);
                                     } catch (e) {
                                         console.error('Failed to cancel conversion', e);
+                                        // Even if cancel fails, mark as idle and try next
+                                        updateStatus(file.id, 'idle');
+                                        updateProgress(file.id, 0);
+                                        setConversionDetails(prev => {
+                                            const next = { ...prev };
+                                            delete next[file.id];
+                                            return next;
+                                        });
+                                        setTimeout(() => {
+                                            startNextConversion();
+                                        }, 200);
                                     }
                                 }}
                                 className="hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-full"
                                 title="Arrêter la conversion"
                             >
                                 <X className="w-4 h-4" />
+                            </Button>
+                        )}
+                        {(file.status === 'completed' || file.status === 'error') && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                    // Reset to idle and queue for conversion
+                                    updateStatus(file.id, 'idle');
+                                    updateProgress(file.id, 0);
+                                    setConversionDetails(prev => {
+                                        const next = { ...prev };
+                                        delete next[file.id];
+                                        return next;
+                                    });
+                                    // Queue it for conversion
+                                    setTimeout(() => {
+                                        updateStatus(file.id, 'queued');
+                                        startNextConversion();
+                                    }, 100);
+                                }}
+                                className="hover:bg-primary/10 hover:text-primary text-muted-foreground rounded-full"
+                                title="Relancer la conversion"
+                            >
+                                <Play className="w-4 h-4" />
                             </Button>
                         )}
                         <Button
@@ -213,8 +264,12 @@ const FileItem = React.memo(({
                         <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeFile(file.id)}
+                            onClick={() => {
+                                console.log(`Removing file ${file.name} (ID: ${file.id})`);
+                                removeFile(file.id);
+                            }}
                             className="hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-full"
+                            title="Supprimer le fichier"
                         >
                             <Trash2 className="w-4 h-4" />
                         </Button>
@@ -595,18 +650,25 @@ export const VideoList: React.FC = () => {
     };
 
     // Function to start the next conversion in the queue
-    const startNextConversion = async () => {
+    const startNextConversion = React.useCallback(async () => {
+        // Get fresh state from store to avoid stale closures
+        const currentFiles = useVideoStore.getState().files;
+        
         // Check if there's already a conversion running
-        const isConverting = files.some(f => f.status === 'converting');
+        const isConverting = currentFiles.some(f => f.status === 'converting');
         if (isConverting) {
+            console.log('Already converting, skipping...');
             return; // Already converting, don't start another
         }
 
         // Find the first file in queue
-        const nextFile = files.find(f => f.status === 'queued');
+        const nextFile = currentFiles.find(f => f.status === 'queued');
         if (!nextFile) {
+            console.log('No files in queue');
             return; // No files in queue
         }
+
+        console.log(`Starting conversion for ${nextFile.name} (ID: ${nextFile.id})`);
 
         try {
             const store = await Store.load('settings.json');
@@ -632,21 +694,46 @@ export const VideoList: React.FC = () => {
             // If outputDir is set, use it. Otherwise use input file's directory.
             let outputPath = '';
 
-            // Determine filename
+            // Determine filename - extract just the filename if it contains a path
             let finalFilename = nextFile.conversionSettings?.outputName;
             if (!finalFilename) {
                 const originalName = nextFile.name.replace(/(\.[\w\d]+)$/, ''); // Remove extension
                 const ext = nextFile.conversionSettings?.container || defaultPreset.container || 'mp4';
                 finalFilename = `${originalName}_optimized.${ext}`;
+            } else {
+                // If finalFilename contains a path, extract just the filename
+                // Normalize separators first
+                const normalized = finalFilename.replace(/\\/g, '/');
+                const lastSlash = normalized.lastIndexOf('/');
+                if (lastSlash !== -1) {
+                    finalFilename = normalized.substring(lastSlash + 1);
+                }
             }
-            // Ensure extension
-            // ... (existing logic)
+
+            // Ensure the filename has the correct extension
+            const desiredExt = nextFile.conversionSettings?.container || defaultPreset.container || 'mp4';
+            if (!finalFilename.toLowerCase().endsWith(`.${desiredExt.toLowerCase()}`)) {
+                // Remove existing extension and add the correct one
+                finalFilename = finalFilename.replace(/\.[\w\d]+$/i, '') + `.${desiredExt}`;
+            }
 
             if (outputDir) {
-                // Normalize path separators for Windows
-                const normalizedDir = outputDir.replace(/\\/g, '/');
-                const separator = normalizedDir.endsWith('/') ? '' : '/';
-                outputPath = `${normalizedDir}${separator}${finalFilename}`;
+                // Normalize path separators for Windows - ensure it's a directory path
+                let normalizedDir = outputDir.replace(/\\/g, '/');
+                // Remove trailing slash if present
+                normalizedDir = normalizedDir.replace(/\/+$/, '');
+                
+                // Check if outputDir might be a file path instead of a directory
+                // If it ends with an extension, it's likely a file, so extract the directory
+                if (normalizedDir.match(/\.[a-zA-Z0-9]+$/)) {
+                    const lastSlash = normalizedDir.lastIndexOf('/');
+                    if (lastSlash !== -1) {
+                        normalizedDir = normalizedDir.substring(0, lastSlash);
+                    }
+                }
+                
+                // Ensure we have a separator
+                outputPath = `${normalizedDir}/${finalFilename}`;
             } else {
                 // Same directory as input
                 const normalizedPath = nextFile.path.replace(/\\/g, '/');
@@ -654,6 +741,15 @@ export const VideoList: React.FC = () => {
                 const dir = lastSlash !== -1 ? normalizedPath.substring(0, lastSlash + 1) : './';
                 outputPath = `${dir}${finalFilename}`;
             }
+            
+            // Final validation: ensure the path doesn't contain duplicate separators or mixed separators
+            outputPath = outputPath.replace(/\/+/g, '/').replace(/\\+/g, '/');
+            
+            console.log('Constructed output path:', {
+                outputDir,
+                finalFilename,
+                outputPath
+            });
 
             // Ensure crf is a valid number (0-51)
             const crfValue = nextFile.conversionSettings?.crf ?? defaultPreset.video.crf ?? 23;
@@ -691,12 +787,24 @@ export const VideoList: React.FC = () => {
             }).then(() => {
                 console.log(`Conversion completed for ${nextFile.name}`);
                 updateStatus(nextFile.id, 'completed');
+                // Clear conversion details for this file
+                setConversionDetails(prev => {
+                    const next = { ...prev };
+                    delete next[nextFile.id];
+                    return next;
+                });
                 // Start next conversion in queue
                 startNextConversion();
             }).catch((e) => {
                 console.error(`Conversion failed for ${nextFile.name}:`, e);
                 // If cancelled manually, it might throw an error or just exit.
                 updateStatus(nextFile.id, 'error');
+                // Clear conversion details for this file
+                setConversionDetails(prev => {
+                    const next = { ...prev };
+                    delete next[nextFile.id];
+                    return next;
+                });
                 // Start next conversion in queue even if this one failed
                 startNextConversion();
             });
@@ -704,22 +812,52 @@ export const VideoList: React.FC = () => {
             console.error('Failed to start conversion', e);
             // If we failed to start, mark as error and try next
             updateStatus(nextFile.id, 'error');
+            // Clear conversion details for this file
+            setConversionDetails(prev => {
+                const next = { ...prev };
+                delete next[nextFile.id];
+                return next;
+            });
             startNextConversion();
         }
-    };
+    }, [updateStatus, setConversionDetails]);
 
     // Function to queue all idle files for conversion
-    const startConversion = async () => {
-        // Put all idle files in queue
-        for (const file of files) {
-            if (file.status === 'idle') {
-                updateStatus(file.id, 'queued');
-            }
+    const [isStarting, setIsStarting] = React.useState(false);
+    const startConversion = React.useCallback(async () => {
+        // Prevent double-clicks
+        if (isStarting) {
+            console.log('Conversion already starting, ignoring...');
+            return;
         }
 
-        // Start the first conversion
-        startNextConversion();
-    };
+        setIsStarting(true);
+        try {
+            // Get current files from store
+            const currentFiles = useVideoStore.getState().files;
+            
+            // Put all idle files in queue
+            let queuedCount = 0;
+            for (const file of currentFiles) {
+                if (file.status === 'idle') {
+                    updateStatus(file.id, 'queued');
+                    queuedCount++;
+                }
+            }
+
+            console.log(`Queued ${queuedCount} files for conversion`);
+
+            // Wait a bit for state to update, then start the first conversion
+            // Use setTimeout to ensure state updates are processed
+            setTimeout(() => {
+                startNextConversion();
+                setIsStarting(false);
+            }, 100);
+        } catch (e) {
+            console.error('Failed to start conversion', e);
+            setIsStarting(false);
+        }
+    }, [isStarting, updateStatus, startNextConversion]);
 
 
 
@@ -731,10 +869,11 @@ export const VideoList: React.FC = () => {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         onClick={startConversion}
-                        className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold shadow-lg hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+                        disabled={isStarting || files.some(f => f.status === 'converting')}
+                        className="flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-semibold shadow-lg hover:bg-primary/90 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
                         <Play className="w-5 h-5 fill-current" />
-                        Start Conversion
+                        {isStarting ? 'Starting...' : 'Start Conversion'}
                     </motion.button>
                 )}
             </div>
@@ -753,6 +892,8 @@ export const VideoList: React.FC = () => {
                         availablePresets={availablePresets}
                         defaultPresetId={defaultPresetId}
                         updateStatus={updateStatus}
+                        updateProgress={updateProgress}
+                        setConversionDetails={setConversionDetails}
                         startNextConversion={startNextConversion}
                     />
                 ))}
