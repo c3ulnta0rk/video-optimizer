@@ -11,6 +11,15 @@ function App() {
   const files = useVideoStore((state) => state.files);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Detect Windows and apply Windows 11 radius
+  useEffect(() => {
+    const isWindows = navigator.platform.toLowerCase().includes('win') || 
+                     navigator.userAgent.toLowerCase().includes('windows');
+    if (isWindows) {
+      document.documentElement.classList.add('windows');
+    }
+  }, []);
+
 
   useEffect(() => {
     const unlisten = listen('conversion_progress', (event: any) => {

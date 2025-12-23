@@ -8,9 +8,10 @@ export default {
     theme: {
         extend: {
             borderRadius: {
+                xl: 'var(--radius)', // Windows 11: 8px for windows/dialogs
                 lg: 'var(--radius)',
-                md: 'calc(var(--radius) - 2px)',
-                sm: 'calc(var(--radius) - 4px)'
+                md: 'var(--radius-md, calc(var(--radius) - 2px))',
+                sm: 'var(--radius-sm, calc(var(--radius) - 4px))'
             },
             colors: {
                 background: 'hsl(var(--background))',

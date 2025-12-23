@@ -31,6 +31,13 @@
     --chart-5: 27 87% 67%;
   }
 
+  /* Windows 11 radius values: 8px for windows/dialogs, 4px for buttons/inputs */
+  :root.windows {
+    --radius: 0.5rem; /* 8px for large elements (windows, dialogs) */
+    --radius-md: 0.25rem; /* 4px for medium elements (buttons, inputs) - Windows 11 standard */
+    --radius-sm: 0.25rem; /* 4px for small elements - Windows 11 standard */
+  }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
