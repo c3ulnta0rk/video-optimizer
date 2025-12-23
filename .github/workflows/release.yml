@@ -40,14 +40,11 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Sync node version and setup cache
-        uses: actions/setup-node@v4
-        with:
-          node-version: 'lts/*'
-          cache: 'npm' # or 'pnpm' / 'yarn'
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Install frontend dependencies
-        run: npm install # or pnpm install / yarn install
+        run: bun install
 
       - name: Build the app
         uses: tauri-apps/tauri-action@v0
