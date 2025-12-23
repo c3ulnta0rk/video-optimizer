@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, X, Film, Calendar, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Film, Calendar, Loader2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { Store } from '@tauri-apps/plugin-store';
 import { Button } from './ui/Button';
@@ -18,6 +18,7 @@ interface MetadataSearchDialogProps {
     isOpen: boolean;
     onClose: () => void;
     initialQuery: string;
+    initialYear?: string;
     onSelect: (movie: MovieSearchResult) => void;
 }
 
@@ -25,6 +26,7 @@ export const MetadataSearchDialog: React.FC<MetadataSearchDialogProps> = ({
     isOpen,
     onClose,
     initialQuery,
+    initialYear,
     onSelect
 }) => {
     const [query, setQuery] = useState(initialQuery);
@@ -32,12 +34,16 @@ export const MetadataSearchDialog: React.FC<MetadataSearchDialogProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [apiKey, setApiKey] = useState('');
+    const [hasAutoSelected, setHasAutoSelected] = useState(false);
+    const [hasAutoSearched, setHasAutoSearched] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             setQuery(initialQuery);
             setResults([]);
             setError(null);
+            setHasAutoSelected(false);
+            setHasAutoSearched(false);
             loadApiKey();
         }
     }, [isOpen, initialQuery]);
@@ -53,7 +59,7 @@ export const MetadataSearchDialog: React.FC<MetadataSearchDialogProps> = ({
         }
     };
 
-    const handleSearch = async () => {
+    const handleSearch = useCallback(async () => {
         if (!query.trim() || !apiKey) return;
 
         setIsLoading(true);
@@ -69,30 +75,55 @@ export const MetadataSearchDialog: React.FC<MetadataSearchDialogProps> = ({
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [query, apiKey]);
 
     // Auto-search on open if query is present and key exists
     useEffect(() => {
-        if (isOpen && apiKey && query && results.length === 0 && !isLoading && !error) {
-            // Optional: Auto search. Let's wait for user to press enter or click search to avoid spamming if query is bad.
-            // But for better UX, maybe we can auto-search if query looks "clean".
-            // For now, let's just let user search.
+        if (isOpen && apiKey && query.trim() && !hasAutoSearched && !isLoading) {
+            // Launch search automatically
+            setHasAutoSearched(true);
+            handleSearch();
         }
-    }, [isOpen, apiKey]);
+    }, [isOpen, apiKey, query, hasAutoSearched, isLoading, handleSearch]);
+
+    // Auto-select if there's a single result or a result matching the year
+    useEffect(() => {
+        if (results.length > 0 && !hasAutoSelected && !isLoading) {
+            let movieToSelect: MovieSearchResult | null = null;
+
+            if (results.length === 1) {
+                // Single result - auto-select it
+                movieToSelect = results[0];
+            } else if (initialYear) {
+                // Multiple results - try to find one matching the year
+                const matchingYear = results.find(movie => {
+                    const movieYear = movie.release_date?.split('-')[0];
+                    return movieYear === initialYear;
+                });
+                if (matchingYear) {
+                    movieToSelect = matchingYear;
+                }
+            }
+
+            if (movieToSelect) {
+                setHasAutoSelected(true);
+                // Small delay to show the results briefly before auto-selecting
+                setTimeout(() => {
+                    onSelect(movieToSelect!);
+                    onClose();
+                }, 300);
+            }
+        }
+    }, [results, initialYear, hasAutoSelected, isLoading, onSelect, onClose]);
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
                 <DialogHeader>
-                    <div className="flex items-center justify-between w-full">
-                        <DialogTitle className="flex items-center gap-2">
-                            <Film className="w-5 h-5" />
-                            Search Metadata
-                        </DialogTitle>
-                        <Button variant="ghost" size="icon" onClick={onClose}>
-                            <X className="w-5 h-5" />
-                        </Button>
-                    </div>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Film className="w-5 h-5" />
+                        Search Metadata
+                    </DialogTitle>
                 </DialogHeader>
 
                 <div className="p-4 border-b bg-muted/30">

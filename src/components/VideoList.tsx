@@ -11,6 +11,7 @@ import { MetadataSearchDialog } from './MetadataSearchDialog';
 import { Select } from './ui/Select';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
+import { extractMovieTitleAndYear } from '../utils/metadataUtils';
 
 // Extract FileItem to a memoized component to prevent re-renders of all items when one changes
 const FileItem = React.memo(({
@@ -509,10 +510,11 @@ export const VideoList: React.FC = () => {
     const [conversionDetails, setConversionDetails] = React.useState<Record<string, { fps: number, time: string, elapsed_time: string, speed: string, time_remaining?: string }>>({});
 
     // Metadata Search State
-    const [searchDialogState, setSearchDialogState] = React.useState<{ isOpen: boolean, fileId: string | null, query: string }>({
+    const [searchDialogState, setSearchDialogState] = React.useState<{ isOpen: boolean, fileId: string | null, query: string, year?: string }>({
         isOpen: false,
         fileId: null,
-        query: ''
+        query: '',
+        year: undefined
     });
 
     const [availablePresets, setAvailablePresets] = React.useState<any[]>([]);
@@ -577,13 +579,17 @@ export const VideoList: React.FC = () => {
         setExpandedFileId(prev => prev === id ? null : id);
     };
 
+
     const openSearchDialog = (id: string) => {
         const file = files.find(f => f.id === id);
         if (file) {
+            // Extract movie title and year intelligently
+            const { title, year } = extractMovieTitleAndYear(file.name);
             setSearchDialogState({
                 isOpen: true,
                 fileId: id,
-                query: file.name.replace(/(\.[\w\d]+)$/, '').replace(/[._]/g, ' ')
+                query: title,
+                year: year || undefined
             });
         }
     };
@@ -756,6 +762,7 @@ export const VideoList: React.FC = () => {
                 isOpen={searchDialogState.isOpen}
                 onClose={() => setSearchDialogState(prev => ({ ...prev, isOpen: false }))}
                 initialQuery={searchDialogState.query}
+                initialYear={searchDialogState.year}
                 onSelect={(movie) => {
                     if (searchDialogState.fileId) {
                         const fileId = searchDialogState.fileId;
