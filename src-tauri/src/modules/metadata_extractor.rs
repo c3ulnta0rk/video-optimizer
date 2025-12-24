@@ -74,6 +74,9 @@ pub fn extract_metadata(file_path: &str) -> Result<VideoMetadata, String> {
     let mut audio_streams = Vec::new();
     let mut subtitle_streams = Vec::new();
 
+    // First pass: collect all video streams to find the one with highest resolution
+    let mut best_video_stream: Option<(u32, u32, String)> = None; // (width, height, codec)
+
     if let Some(streams) = json["streams"].as_array() {
         for stream in streams {
             let codec_type = stream["codec_type"].as_str().unwrap_or("");
@@ -85,9 +88,19 @@ pub fn extract_metadata(file_path: &str) -> Result<VideoMetadata, String> {
             let language = stream["tags"]["language"].as_str().map(|s| s.to_string());
 
             if codec_type == "video" {
-                width = stream["width"].as_u64().unwrap_or(0) as u32;
-                height = stream["height"].as_u64().unwrap_or(0) as u32;
-                video_codec = codec_name;
+                let stream_width = stream["width"].as_u64().unwrap_or(0) as u32;
+                let stream_height = stream["height"].as_u64().unwrap_or(0) as u32;
+                
+                // Select the video stream with the highest resolution (width * height)
+                let current_resolution = stream_width as u64 * stream_height as u64;
+                let best_resolution = best_video_stream
+                    .as_ref()
+                    .map(|(w, h, _)| *w as u64 * *h as u64)
+                    .unwrap_or(0);
+                
+                if current_resolution > best_resolution {
+                    best_video_stream = Some((stream_width, stream_height, codec_name.clone()));
+                }
             } else if codec_type == "audio" {
                 let channels = stream["channels"].as_u64().unwrap_or(2) as u32;
                 audio_streams.push(AudioStream {
@@ -102,10 +115,15 @@ pub fn extract_metadata(file_path: &str) -> Result<VideoMetadata, String> {
                     codec_name,
                     language,
                 });
-                // Note: SubtitleStream definition above doesn't have channels, so we are good.
-                // Wait, I need to check SubtitleStream definition again.
             }
         }
+    }
+
+    // Use the best video stream found
+    if let Some((w, h, codec)) = best_video_stream {
+        width = w;
+        height = h;
+        video_codec = codec;
     }
 
     // Extract total frames from video stream

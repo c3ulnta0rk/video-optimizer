@@ -7,6 +7,9 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::task;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 #[derive(Clone, Serialize, Debug)]
 pub struct ConversionProgress {
     pub id: String,
@@ -225,11 +228,19 @@ pub async fn convert_video(
     // Log the command for debugging
     eprintln!("[FFmpeg Command]: ffmpeg {}", args.join(" "));
 
-    let mut child = Command::new("ffmpeg")
-        .args(&args)
+    let mut cmd = Command::new("ffmpeg");
+    cmd.args(&args)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+    
+    // Hide console window on Windows
+    #[cfg(windows)]
+    {
+        // CREATE_NO_WINDOW = 0x08000000
+        cmd.creation_flags(0x08000000);
+    }
+    
+    let mut child = cmd.spawn()
         .map_err(|e| {
             let error_msg = format!(
                 "Failed to start ffmpeg: {}. Make sure ffmpeg is installed and in your PATH.",
