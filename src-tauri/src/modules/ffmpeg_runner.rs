@@ -2,9 +2,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use tauri::{Emitter, State, Window};
+use tauri::{Emitter, Manager, State, Window};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::Mutex as TokioMutex;
 use tokio::task;
 
 #[cfg(windows)]
@@ -15,11 +16,11 @@ pub struct ConversionProgress {
     pub id: String,
     pub frame: u64,
     pub fps: f64,
-    pub time: String, // Time position in the output video (HH:MM:SS)
+    pub time: String,         // Time position in the output video (HH:MM:SS)
     pub elapsed_time: String, // Time elapsed since conversion started (HH:MM:SS)
     pub bitrate: String,
     pub speed: String,
-    pub progress: f64, // 0.0 to 100.0
+    pub progress: f64,                  // 0.0 to 100.0
     pub time_remaining: Option<String>, // Estimated time remaining (HH:MM:SS)
 }
 
@@ -46,7 +47,8 @@ pub struct ConversionOptions {
 }
 
 pub struct ConversionManager {
-    pub processes: Arc<Mutex<HashMap<String, u32>>>,
+    // Store Arc<TokioMutex<Child>> to allow killing from other commands
+    pub processes: Arc<Mutex<HashMap<String, Arc<TokioMutex<tokio::process::Child>>>>>,
 }
 
 impl ConversionManager {
@@ -77,7 +79,7 @@ pub async fn convert_video(
             "fast".to_string() // Default software preset
         }
     });
-    
+
     // Convert software preset names to NVENC presets if using NVENC
     let final_preset = if options.video_codec.contains("nvenc") {
         match preset.as_str() {
@@ -102,7 +104,7 @@ pub async fn convert_video(
     } else {
         preset.as_str()
     };
-    
+
     args.push("-preset".to_string());
     args.push(final_preset.to_string());
 
@@ -216,12 +218,12 @@ pub async fn convert_video(
     // Create a temporary progress file
     let progress_file = std::env::temp_dir().join(format!("ffmpeg_progress_{}.txt", options.id));
     let progress_file_str = progress_file.to_string_lossy().to_string();
-    
+
     // Use -progress to force FFmpeg to write progress to a file
     // This is the most reliable way to get progress when stderr is not a TTY
     args.push("-progress".to_string());
     args.push(progress_file_str.clone());
-    
+
     args.push("-y".to_string());
     args.push(options.output_path.clone());
 
@@ -232,64 +234,74 @@ pub async fn convert_video(
     cmd.args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    
+
     // Hide console window on Windows
     #[cfg(windows)]
     {
         // CREATE_NO_WINDOW = 0x08000000
         cmd.creation_flags(0x08000000);
     }
-    
-    let mut child = cmd.spawn()
-        .map_err(|e| {
-            let error_msg = format!(
-                "Failed to start ffmpeg: {}. Make sure ffmpeg is installed and in your PATH.",
-                e
-            );
-            eprintln!("{}", error_msg);
-            error_msg
-        })?;
 
-    if let Some(pid) = child.id() {
-        state
-            .processes
-            .lock()
-            .unwrap()
-            .insert(options.id.clone(), pid);
-    }
+    let mut child = cmd.spawn().map_err(|e| {
+        let error_msg = format!(
+            "Failed to start ffmpeg: {}. Make sure ffmpeg is installed and in your PATH.",
+            e
+        );
+        eprintln!("{}", error_msg);
+        error_msg
+    })?;
+
+    // Capture stderr before moving child
+    let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
+
+    let child_shared = Arc::new(TokioMutex::new(child));
+
+    state
+        .processes
+        .lock()
+        .unwrap()
+        .insert(options.id.clone(), child_shared.clone());
+
+    // Enable "Stop" button in Tray
+    crate::set_stop_enabled(window.app_handle(), true);
 
     // Spawn a task to read the progress file
     let progress_file_clone = progress_file.clone();
     let window_clone = window.clone();
     let options_id = options.id.clone();
+    let options_filename = std::path::Path::new(&options.input_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("Unknown")
+        .to_string();
     let options_duration = options.duration_seconds;
     let options_total_frames = options.total_frames;
-    
+
     // Create a channel to signal when conversion is done
     let (tx, mut rx) = tokio::sync::oneshot::channel::<()>();
     let tx_clone = tx;
-    
+
     let progress_task = task::spawn(async move {
-        use tokio::time::{sleep, Duration, Instant};
         use std::collections::VecDeque;
-        
+        use tokio::time::{sleep, Duration, Instant};
+
         // History to calculate average speed over last 10 seconds
         // Store (timestamp, frame_count) pairs
         let mut frame_history: VecDeque<(Instant, u64)> = VecDeque::new();
         const HISTORY_DURATION_SECS: u64 = 10;
-        
+
         // Track when conversion started
         let start_time = Instant::now();
-        
+
         // Wait a bit for the file to be created
         sleep(Duration::from_millis(500)).await;
-        
+
         loop {
             // Check if we should stop
             if rx.try_recv().is_ok() {
                 break;
             }
-            
+
             // Read the entire progress file and parse it
             if let Ok(content) = tokio::fs::read_to_string(&progress_file_clone).await {
                 let mut frame = 0u64;
@@ -297,7 +309,7 @@ pub async fn convert_video(
                 let mut bitrate = String::new();
                 let mut speed = String::new();
                 let mut time_ms = 0.0;
-                
+
                 for line in content.lines() {
                     if line.starts_with("frame=") {
                         if let Some(val) = line.strip_prefix("frame=") {
@@ -321,7 +333,7 @@ pub async fn convert_video(
                         }
                     }
                 }
-                
+
                 // Only emit if we have valid frame data
                 if frame > 0 {
                     let current_seconds = if time_ms > 0.0 {
@@ -329,25 +341,29 @@ pub async fn convert_video(
                     } else {
                         0.0
                     };
-                    
+
                     // Calculate progress based on frames if we have total_frames
                     let progress = if let Some(total_frames) = options_total_frames {
                         if total_frames > 0 {
-                            ((frame as f64 / total_frames as f64) * 100.0).min(100.0).max(0.0)
+                            ((frame as f64 / total_frames as f64) * 100.0)
+                                .min(100.0)
+                                .max(0.0)
                         } else {
                             0.0
                         }
                     } else if options_duration > 0.0 && current_seconds > 0.0 {
                         // Fallback to time-based if frames not available
-                        (current_seconds / options_duration * 100.0).min(100.0).max(0.0)
+                        (current_seconds / options_duration * 100.0)
+                            .min(100.0)
+                            .max(0.0)
                     } else {
                         0.0
                     };
-                    
+
                     // Update frame history for average speed calculation
                     let now = Instant::now();
                     frame_history.push_back((now, frame));
-                    
+
                     // Remove entries older than HISTORY_DURATION_SECS
                     while let Some(&(timestamp, _)) = frame_history.front() {
                         if now.duration_since(timestamp).as_secs() > HISTORY_DURATION_SECS {
@@ -356,14 +372,14 @@ pub async fn convert_video(
                             break;
                         }
                     }
-                    
+
                     // Calculate average frames per second over the last 10 seconds
                     let avg_fps = if frame_history.len() >= 2 {
                         let oldest = frame_history.front().unwrap();
                         let newest = frame_history.back().unwrap();
                         let time_diff = newest.0.duration_since(oldest.0).as_secs_f64();
                         let frame_diff = newest.1.saturating_sub(oldest.1) as f64;
-                        
+
                         if time_diff > 0.0 {
                             frame_diff / time_diff
                         } else {
@@ -372,7 +388,7 @@ pub async fn convert_video(
                     } else {
                         fps // Use current fps if not enough history
                     };
-                    
+
                     // Calculate time remaining based on average speed
                     let time_remaining = if let Some(total_frames) = options_total_frames {
                         if total_frames > frame && avg_fps > 0.0 {
@@ -389,7 +405,7 @@ pub async fn convert_video(
                     } else {
                         None
                     };
-                    
+
                     // Format time remaining
                     let time_remaining_str = time_remaining.map(|secs| {
                         let hours = (secs as u64) / 3600;
@@ -397,7 +413,7 @@ pub async fn convert_video(
                         let secs_remaining = (secs as u64) % 60;
                         format!("{:02}:{:02}:{:02}", hours, minutes, secs_remaining)
                     });
-                    
+
                     // Format current time (position in output video)
                     let time_str = if current_seconds > 0.0 {
                         let hours = (current_seconds as u64) / 3600;
@@ -407,14 +423,17 @@ pub async fn convert_video(
                     } else {
                         String::new()
                     };
-                    
+
                     // Calculate elapsed time since conversion started
                     let elapsed_seconds = start_time.elapsed().as_secs();
                     let elapsed_hours = elapsed_seconds / 3600;
                     let elapsed_minutes = (elapsed_seconds % 3600) / 60;
                     let elapsed_secs = elapsed_seconds % 60;
-                    let elapsed_time_str = format!("{:02}:{:02}:{:02}", elapsed_hours, elapsed_minutes, elapsed_secs);
-                    
+                    let elapsed_time_str = format!(
+                        "{:02}:{:02}:{:02}",
+                        elapsed_hours, elapsed_minutes, elapsed_secs
+                    );
+
                     // Only emit if progress is reasonable (not jumping to 100% immediately)
                     if progress < 100.0 || frame >= options_total_frames.unwrap_or(u64::MAX) {
                         let progress_data = ConversionProgress {
@@ -426,46 +445,63 @@ pub async fn convert_video(
                             bitrate,
                             speed,
                             progress,
-                            time_remaining: time_remaining_str,
+                            time_remaining: time_remaining_str.clone(),
                         };
-                        
-                        let _ = window_clone.emit("conversion_progress", progress_data);
+
+                        let _ = window_clone
+                            .app_handle()
+                            .emit("conversion_progress", progress_data);
+
+                        // Update Tray Status
+                        // Update Tray Status
+                        let display_name = if options_filename.len() > 20 {
+                            format!(
+                                "{}...",
+                                options_filename.chars().take(20).collect::<String>()
+                            )
+                        } else {
+                            options_filename.clone()
+                        };
+
+                        let tray_text = format!(
+                            "Converting: {} ({:.0}%) - {}",
+                            display_name,
+                            progress,
+                            time_remaining_str.as_deref().unwrap_or("--:--")
+                        );
+                        crate::update_tray_status(window_clone.app_handle(), &tray_text);
                     }
                 }
             }
-            
+
             sleep(Duration::from_millis(200)).await; // Check every 200ms
         }
     });
-    
+
     // Read stderr for errors and warnings
-    let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
     let reader = BufReader::new(stderr);
     let mut lines = reader.lines();
-    
+
     while let Ok(Some(line)) = lines.next_line().await {
         // Log stderr lines (warnings, errors)
         eprintln!("[FFmpeg Stderr]: {}", line);
     }
-    
+
     // Signal progress task to stop
     let _ = tx_clone.send(());
-    
+
     // Wait a bit for the task to finish, then abort if needed
     tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
     progress_task.abort();
-    
+
     // Clean up progress file
     let _ = std::fs::remove_file(&progress_file);
 
-    let status = child
-        .wait()
-        .await
-        .map_err(|e| {
-            let error_msg = format!("Failed to wait for ffmpeg: {}", e);
-            eprintln!("{}", error_msg);
-            error_msg
-        })?;
+    let status = child_shared.lock().await.wait().await.map_err(|e| {
+        let error_msg = format!("Failed to wait for ffmpeg: {}", e);
+        eprintln!("{}", error_msg);
+        error_msg
+    })?;
 
     // Remove PID from map
     state.processes.lock().unwrap().remove(&options.id);
@@ -477,49 +513,69 @@ pub async fn convert_video(
             exit_code
         );
         eprintln!("{}", error_msg);
+        crate::set_stop_enabled(window.app_handle(), false);
         return Err(error_msg);
     }
 
-    eprintln!("[FFmpeg] Conversion completed successfully for {}", options.id);
+    eprintln!(
+        "[FFmpeg] Conversion completed successfully for {}",
+        options.id
+    );
+
+    // Reset Tray Status
+    crate::update_tray_status(window.app_handle(), "No active conversions");
+    crate::set_stop_enabled(window.app_handle(), false);
+
     Ok(())
 }
 
-pub fn cancel_conversion(id: &str, state: State<'_, ConversionManager>) -> Result<(), String> {
-    let pid = {
-        let processes = state.processes.lock().unwrap();
-        processes.get(id).cloned()
+pub async fn cancel_conversion(
+    id: &str,
+    state: State<'_, ConversionManager>,
+) -> Result<(), String> {
+    let child_arc = {
+        let mut processes = state.processes.lock().unwrap();
+        processes.remove(id)
     };
 
-    if let Some(pid) = pid {
-        #[cfg(unix)]
-        {
-            // Use libc to send SIGTERM for a cleaner exit, then SIGKILL if needed
-            // For now, sticking to "kill" command is simple and effective for external processes
-            // But let's try to be a bit more graceful
-            let _ = std::process::Command::new("kill")
-                .arg("-15") // SIGTERM
-                .arg(pid.to_string())
-                .output();
-
-            // Give it a moment? No, async context here is tricky without async function.
-            // Let's just force kill for now to be sure, as FFmpeg might not exit immediately on SIGTERM during heavy load
-            let _ = std::process::Command::new("kill")
-                .arg("-9") // SIGKILL
-                .arg(pid.to_string())
-                .output()
-                .map_err(|e| format!("Failed to kill process: {}", e))?;
-        }
-        #[cfg(windows)]
-        {
-            let _ = std::process::Command::new("taskkill")
-                .arg("/F")
-                .arg("/PID")
-                .arg(pid.to_string())
-                .output()
-                .map_err(|e| format!("Failed to kill process: {}", e))?;
-        }
+    if let Some(child_arc) = child_arc {
+        let mut child = child_arc.lock().await;
+        child
+            .start_kill()
+            .map_err(|e| format!("Failed to kill process: {}", e))?;
         Ok(())
     } else {
         Err("Process not found".to_string())
+    }
+}
+
+pub async fn kill_all(state: State<'_, ConversionManager>) {
+    let processes = {
+        let mut map = state.processes.lock().unwrap();
+        let items: Vec<_> = map.drain().collect();
+        items
+    };
+
+    eprintln!(
+        "[FFmpeg] Killing all {} active processes...",
+        processes.len()
+    );
+
+    for (id, child_arc) in processes {
+        eprintln!("[FFmpeg] Killing process for conversion {}", id);
+        let mut child = child_arc.lock().await;
+        if let Err(e) = child.start_kill() {
+            eprintln!("[FFmpeg] Failed to kill process {}: {}", id, e);
+        }
+    }
+}
+
+pub async fn cancel_current(state: State<'_, ConversionManager>) {
+    let id_to_cancel = {
+        let processes = state.processes.lock().unwrap();
+        processes.keys().next().cloned()
+    };
+    if let Some(id) = id_to_cancel {
+        let _ = cancel_conversion(&id, state).await;
     }
 }

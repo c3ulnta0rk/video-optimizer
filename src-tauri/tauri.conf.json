@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Video Optimizer",
         "width": 1024,
         "height": 768,

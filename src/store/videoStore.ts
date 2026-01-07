@@ -30,13 +30,18 @@ export interface FileItem {
     overview?: string;
     releaseDate?: string;
     conversionSettings?: ConversionSettingsOverride;
+    // Progress details
+    timeRemaining?: string;
+    speed?: string;
+    fps?: number;
+    eta?: string;
 }
 
 interface VideoStore {
     files: FileItem[];
     addFiles: (newFiles: FileItem[]) => void;
     removeFile: (id: string) => void;
-    updateProgress: (id: string, progress: number) => void;
+    updateProgress: (id: string, progress: number, details?: { timeRemaining?: string, speed?: string, fps?: number }) => void;
     updateStatus: (id: string, status: FileItem['status']) => void;
     updateFileSettings: (id: string, settings: ConversionSettingsOverride) => void;
     updateMetadata: (id: string, metadata: Partial<FileItem>) => void;
@@ -51,20 +56,27 @@ export const useVideoStore = create<VideoStore>((set) => ({
     removeFile: (id) => set((state) => ({
         files: state.files.filter((f) => f.id !== id)
     })),
-    updateProgress: (id, progress) => set((state) => ({
+    updateProgress: (id, progress, details) => set((state) => ({
         files: state.files.map((f) =>
-            f.id === id ? { ...f, progress } : f
+            f.id === id ? {
+                ...f,
+                progress,
+                ...(details || {})
+            } : f
         )
     })),
     updateStatus: (id, status) => set((state) => ({
         files: state.files.map((f) =>
-            f.id === id ? { 
-                ...f, 
+            f.id === id ? {
+                ...f,
                 status,
                 // Reset progress when status changes to idle, queued, or error
                 // Keep progress at 100% for completed files, but reset if going back to queued/idle
-                progress: (status === 'idle' || status === 'queued' || status === 'error') ? 0 : 
-                         (status === 'completed' ? 100 : f.progress)
+                progress: (status === 'idle' || status === 'queued' || status === 'error') ? 0 :
+                    (status === 'completed' ? 100 : f.progress),
+                timeRemaining: undefined,
+                speed: undefined,
+                fps: undefined
             } : f
         )
     })),
